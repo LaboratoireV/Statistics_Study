@@ -1,5 +1,6 @@
 ---
 title: "Biostatistics Foundations for Public Health"
+pagetitle: "Biostatistics Foundations for Public Health | The V Lab"
 subtitle: "An Introductory Guide with Reproducible R Examples"
 author: "School of Public Health Learning Module"
 date: "Updated `r format(Sys.Date(), '%B %d, %Y')`"
@@ -23,6 +24,8 @@ output:
     df_print: kable
     math_method: mathml
     css: styles.css
+    includes:
+      before_body: includes/vlab-brand.html
 ---
 
 ```{r setup, include=FALSE}

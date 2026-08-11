@@ -1,5 +1,6 @@
 ---
 title: "公共卫生生物统计学基础"
+pagetitle: "公共卫生生物统计学基础 | The V Lab"
 subtitle: "含可重复 R 示例的入门指南"
 author: "公共卫生学院学习模块"
 date: "更新于 `r format(Sys.Date(), '%Y年%m月%d日')`"
@@ -23,6 +24,8 @@ output:
     df_print: kable
     math_method: mathml
     css: styles.css
+    includes:
+      before_body: includes/vlab-brand.html
 ---
 
 ```{r setup, include=FALSE}

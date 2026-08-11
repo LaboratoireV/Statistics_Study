@@ -1,0 +1,1037 @@
+---
+title: "Biostatistics Foundations for Public Health"
+subtitle: "An Introductory Guide with Reproducible R Examples"
+author: "School of Public Health Learning Module"
+date: "Updated `r format(Sys.Date(), '%B %d, %Y')`"
+lang: en
+output:
+  html_document:
+    self_contained: true
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+      print: true
+    number_sections: true
+    anchor_sections: true
+    code_folding: show
+    code_download: true
+    fig_caption: true
+    df_print: kable
+    math_method: mathml
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center",
+  fig.width = 8,
+  fig.height = 4.7,
+  fig.retina = 2,
+  out.width = "100%"
+)
+
+options(stringsAsFactors = FALSE, digits = 3, width = 82)
+
+# A color-blind-friendly palette (Okabe-Ito inspired).
+palette_ph <- c(
+  navy = "#17324D",
+  teal = "#0B6B66",
+  blue = "#0072B2",
+  orange = "#E69F00",
+  vermillion = "#D55E00",
+  purple = "#CC79A7",
+  sky = "#56B4E9",
+  green = "#009E73"
+)
+
+# Create one reproducible, simulated public health dataset.
+set.seed(20260810)
+n <- 520
+age <- round(pmin(pmax(rnorm(n, mean = 45, sd = 16), 18), 85))
+neighborhood <- sample(
+  c("Central", "North", "South", "West"), n, replace = TRUE,
+  prob = c(0.29, 0.23, 0.27, 0.21)
+)
+smoking <- rbinom(n, 1, plogis(-1.55 + 0.012 * (age - 40)))
+access_to_care <- rbinom(
+  n, 1,
+  plogis(0.8 - 0.55 * (neighborhood == "North") +
+           0.20 * (neighborhood == "Central"))
+)
+vaccinated_num <- rbinom(
+  n, 1,
+  plogis(-0.55 + 0.022 * age + 0.75 * access_to_care)
+)
+bmi <- round(pmin(pmax(rnorm(n, 26 + 1.1 * smoking, 4.5), 16), 48), 1)
+physical_activity <- pmax(0, round(rgamma(n, shape = 2.4, scale = 55) - 15))
+systolic_bp <- round(
+  101 + 0.52 * age + 0.42 * (bmi - 25) + 4.5 * smoking + rnorm(n, 0, 11)
+)
+infection_num <- rbinom(
+  n, 1,
+  plogis(-1.05 - 0.85 * vaccinated_num + 0.55 * smoking +
+           0.30 * (neighborhood == "North"))
+)
+
+# Include a small amount of missingness for teaching purposes.
+physical_activity[sample(seq_len(n), 18)] <- NA
+
+ph_data <- data.frame(
+  participant_id = sprintf("P%03d", seq_len(n)),
+  age = age,
+  neighborhood = factor(neighborhood),
+  smoking_status = factor(
+    ifelse(smoking == 1, "Current", "Not current"),
+    levels = c("Not current", "Current")
+  ),
+  physical_activity_min_week = physical_activity,
+  bmi = bmi,
+  systolic_bp = systolic_bp,
+  access_to_care = factor(
+    ifelse(access_to_care == 1, "Yes", "No"),
+    levels = c("No", "Yes")
+  ),
+  vaccinated = factor(
+    ifelse(vaccinated_num == 1, "Yes", "No"),
+    levels = c("No", "Yes")
+  ),
+  respiratory_infection = factor(
+    ifelse(infection_num == 1, "Yes", "No"),
+    levels = c("No", "Yes")
+  )
+)
+
+pct <- function(x, digits = 1) paste0(formatC(100 * x, digits = digits, format = "f"), "%")
+```
+
+<nav class="language-switch" aria-label="Language selection">
+  <a class="language-home" href="biostatistics_bilingual.html">中英双语入口</a>
+  <span class="language-option active" aria-current="page">English</span>
+  <a class="language-option" href="biostatistics_foundations_zh.html" lang="zh-CN">中文</a>
+</nav>
+
+<div class="module-bar">
+  <div class="module-stat"><strong>Audience</strong><span>First-year MPH and public health students</span></div>
+  <div class="module-stat"><strong>Study time</strong><span>About 90–120 minutes</span></div>
+  <div class="module-stat"><strong>Prerequisites</strong><span>Basic arithmetic; no calculus required</span></div>
+</div>
+
+<div class="callout note">
+<span class="callout-title">About the data</span>
+Every record and result in this guide is simulated. The examples are reproducible and contain no identifiable health information. Simulated associations are teaching devices, not evidence about a real population.
+</div>
+
+## How to use this guide {-}
+
+Each chapter follows the same rhythm: **why the idea matters**, **the core concept**, **a public health example**, **R code**, and **an interpretation check**. Read the explanation first, run or adapt the code, and then open the answer panels. Code is visible by default and can be collapsed with the **Code** buttons.
+
+You do not need to memorize every formula. Focus on three habits:
+
+1. connect the method to a well-defined public health question;
+2. state assumptions and uncertainty; and
+3. interpret the size and direction of an effect, not only its p-value.
+
+### Learning objectives {-}
+
+By the end of the module, you should be able to:
+
+- distinguish a population, sample, parameter, statistic, and estimand;
+- identify common study designs, variable types, and major sources of bias;
+- summarize and visualize health data appropriately;
+- calculate and interpret basic frequency, association, and screening measures;
+- explain sampling variability, standard errors, confidence intervals, and p-values;
+- choose common methods for comparing groups;
+- interpret simple linear and logistic regression results without unsupported causal claims; and
+- communicate findings clearly, reproducibly, and ethically.
+
+# From Questions to Evidence
+
+## Why biostatistics matters
+
+**Biostatistics** applies statistical reasoning to questions about health, disease, health services, and populations. It is not only a collection of tests. It is a disciplined path from a question to evidence and then to an appropriately cautious decision.
+
+<div class="takeaway-grid">
+  <div class="takeaway-card"><h4>Describe</h4><p>What health events, exposures, and patterns are present?</p></div>
+  <div class="takeaway-card"><h4>Compare</h4><p>How large are differences between meaningful groups or time periods?</p></div>
+  <div class="takeaway-card"><h4>Learn under uncertainty</h4><p>What can a sample tell us about a target population?</p></div>
+</div>
+
+A useful workflow is:
+
+> **Question → design → measurement → data check → description → estimation → uncertainty → interpretation → action**
+
+Statistics cannot repair a vague question, biased sampling, or poor measurement. Those decisions happen before a p-value is calculated.
+
+## Population, sample, parameter, statistic, estimand
+
+Suppose a city surveys 520 adults to estimate influenza vaccination coverage.
+
+| Term | Meaning | Example |
+|---|---|---|
+| **Target population** | The full group to which the question refers | All non-institutionalized adults living in the city this season |
+| **Sample** | The people actually observed | The 520 survey participants |
+| **Parameter** | A fixed but usually unknown population quantity | The true vaccination proportion among all target adults |
+| **Statistic / estimate** | A quantity calculated from the sample | The observed vaccination proportion in the survey |
+| **Estimand** | A precise description of what is to be estimated | Vaccination coverage during this season in the target population |
+
+The **unit of observation** is also essential. A row might represent a person, household, clinic, neighborhood, or person-day. The method must respect that unit and any clustering.
+
+### Turn a topic into an answerable question
+
+Before opening R, write down:
+
+- **Population:** Who or what is the target?
+- **Exposure or intervention:** What condition, program, or behavior is being compared?
+- **Outcome:** What health measure is being studied, and how is it defined?
+- **Comparison:** Compared with whom, what, or when?
+- **Time:** At a point in time, over a period, or until an event?
+- **Estimand:** A prevalence, risk difference, risk ratio, mean difference, rate ratio, or another quantity?
+
+<div class="callout">
+<span class="callout-title">Worked question</span>
+Among adults living in the city at the start of winter (population), what is the 12-week risk of laboratory-confirmed respiratory infection (outcome) among vaccinated adults compared with unvaccinated adults (comparison), expressed as a risk ratio (estimand)?
+</div>
+
+<details class="knowledge-check">
+<summary>Check your understanding: identify the parameter</summary>
+In a random sample of 800 high-school students, 18% report current vaping. What is the parameter?
+
+**Answer:** The parameter is the true proportion of students in the defined target population who currently vape. The observed 18% is a sample statistic. Whether it estimates the parameter well depends on sampling, measurement, and nonresponse.
+</details>
+
+# Data, Study Designs, and Bias
+
+## Variable roles and types
+
+A variable's role depends on the question.
+
+- An **outcome** is the response or health endpoint of interest.
+- An **exposure** or **intervention** is the main condition being compared.
+- A **covariate** is another measured characteristic used for description, precision, confounding control, or effect-modification assessment.
+- An **identifier** labels units but is not ordinarily analyzed as a health measurement.
+
+| Variable type | What it records | Public health example | Common summary |
+|---|---|---|---|
+| Nominal categorical | Unordered labels | Neighborhood, clinic | Count and proportion |
+| Ordinal categorical | Ordered labels with unknown spacing | Self-rated health: poor to excellent | Count, proportion, median category |
+| Binary | Two categories | Vaccinated: yes/no | Count and proportion |
+| Discrete count | Non-negative event count | Emergency visits in one year | Mean, variance, rate; often a count model |
+| Continuous | Measured numeric value | Blood pressure, age, BMI | Mean/SD or median/IQR |
+| Time-to-event | Time until an event or censoring | Time to relapse | Survival probability, hazard, median survival |
+
+Do not choose a summary from the storage format alone. A postal code stored as a number is still categorical, and a five-point rating is usually ordinal rather than truly continuous.
+
+## Common public health study designs
+
+| Design | How it starts | Useful for | Main caution |
+|---|---|---|---|
+| Cross-sectional survey | Sample people at one time or short period | Prevalence and current patterns | Exposure and outcome timing may be unclear |
+| Cohort study | Group people by exposure and follow outcomes | Incidence, risk, rates, temporal order | Loss to follow-up and confounding |
+| Case-control study | Sample cases and controls, then assess prior exposure | Rare outcomes or long latency | Selection/recall bias; risk is not directly estimated from the sampled table |
+| Randomized trial | Randomly assign an intervention | Intervention effects under the trial conditions | Adherence, loss to follow-up, ethics, and generalizability |
+| Cluster randomized trial | Randomize schools, clinics, or communities | Population-level programs | Outcomes within a cluster are correlated |
+| Surveillance system | Continuously collect defined events | Trends, signals, program monitoring | Changes in case definition, testing, and completeness |
+
+<div class="callout pitfall">
+<span class="callout-title">Design determines interpretation</span>
+A cross-sectional association cannot establish which variable came first. A case-control odds ratio is valid under its sampling design, but the sampled case proportion is not disease prevalence. Clustered data need methods that account for within-cluster similarity.
+</div>
+
+## Bias, chance, and confounding
+
+These are different problems:
+
+| Issue | Plain-language meaning | Example | Typical response |
+|---|---|---|---|
+| **Chance** | Sample results vary from one random sample to another | Coverage is 68% in one sample and 71% in another | Quantify with standard errors and confidence intervals |
+| **Selection bias** | Inclusion is related to variables important to the question | An online survey misses residents without internet access | Improve sampling/recruitment; assess nonresponse |
+| **Information bias** | Exposure or outcome is measured differently or inaccurately | Cases remember a past exposure more completely than controls | Use valid, standardized, blinded measurement when possible |
+| **Confounding** | A common cause creates or distorts an exposure–outcome association | Age affects both vaccination uptake and infection risk | Use design and analysis informed by subject matter and causal reasoning |
+
+Confounding is not simply “any third variable” and is not diagnosed solely by a small p-value. Adjustment helps only when the covariates, model, measurements, and causal assumptions are appropriate.
+
+<details class="knowledge-check">
+<summary>Check your understanding: name the design and a plausible bias</summary>
+Researchers select 300 people with lung cancer and 300 people without lung cancer and ask about occupational asbestos exposure 30 years earlier.
+
+**Answer:** This is a case-control study. Differential recall or reconstruction of old exposure histories could cause information bias; selection of controls could also create selection bias. The odds ratio is the natural association measure from the sampled 2×2 table.
+</details>
+
+# Describing and Visualizing Health Data
+
+## First inspect the data
+
+The first rows of the simulated teaching dataset are shown below. Never begin with a test before checking variable names, units, categories, impossible values, duplicates, and missingness.
+
+```{r inspect-data}
+dim(ph_data)
+head(
+  ph_data[c(
+    "participant_id", "age", "neighborhood", "smoking_status",
+    "physical_activity_min_week", "systolic_bp"
+  )],
+  6
+)
+colSums(is.na(ph_data))
+```
+
+The missing physical-activity values are coded as `NA`, not zero. Zero means a measured value of no activity; `NA` means the value is unknown.
+
+## Center and spread
+
+- The **mean** uses every value and is sensitive to extreme observations.
+- The **median** is the middle ordered value and is resistant to extreme observations.
+- The **standard deviation (SD)** describes how observations vary around their mean.
+- The **interquartile range (IQR)** spans the 25th to 75th percentiles and is resistant to extremes.
+
+Use mean with SD for a reasonably symmetric distribution when those quantities answer the question. Use median with IQR for a strongly skewed distribution or when a typical rank is more meaningful. Always look at the distribution.
+
+```{r descriptive-summary}
+summary_table <- data.frame(
+  Variable = c("Age (years)", "Systolic blood pressure (mmHg)",
+               "Physical activity (min/week)"),
+  N_observed = c(sum(!is.na(ph_data$age)),
+                 sum(!is.na(ph_data$systolic_bp)),
+                 sum(!is.na(ph_data$physical_activity_min_week))),
+  Mean = c(mean(ph_data$age), mean(ph_data$systolic_bp),
+           mean(ph_data$physical_activity_min_week, na.rm = TRUE)),
+  SD = c(sd(ph_data$age), sd(ph_data$systolic_bp),
+         sd(ph_data$physical_activity_min_week, na.rm = TRUE)),
+  Median = c(median(ph_data$age), median(ph_data$systolic_bp),
+             median(ph_data$physical_activity_min_week, na.rm = TRUE)),
+  IQR = c(IQR(ph_data$age), IQR(ph_data$systolic_bp),
+          IQR(ph_data$physical_activity_min_week, na.rm = TRUE))
+)
+
+knitr::kable(summary_table, digits = 1,
+             caption = "Descriptive statistics for simulated participant data")
+```
+
+### Match the graph to the question
+
+- **Bar chart:** counts or proportions across categories.
+- **Histogram:** shape of one continuous variable.
+- **Boxplot:** continuous distributions across groups.
+- **Scatterplot:** relationship between two continuous variables.
+- **Line chart:** a measure ordered over time.
+
+```{r distribution-plots, fig.cap="Systolic blood pressure is roughly unimodal, and its distribution differs by current smoking status in this simulated sample.", fig.alt="Two panels. The left is a histogram of systolic blood pressure. The right shows boxplots for not-current and current smokers."}
+old_par <- par(mfrow = c(1, 2), mar = c(4.2, 4.2, 2.2, 1), las = 1)
+
+hist(
+  ph_data$systolic_bp,
+  breaks = "FD",
+  col = palette_ph["sky"],
+  border = "white",
+  main = "Distribution of systolic BP",
+  xlab = "Systolic blood pressure (mmHg)",
+  ylab = "Participants"
+)
+
+boxplot(
+  systolic_bp ~ smoking_status,
+  data = ph_data,
+  col = c(palette_ph["teal"], palette_ph["orange"]),
+  border = palette_ph["navy"],
+  main = "Systolic BP by smoking status",
+  xlab = "Smoking status",
+  ylab = "Systolic blood pressure (mmHg)"
+)
+
+par(old_par)
+```
+
+<div class="callout pitfall">
+<span class="callout-title">Graphical integrity</span>
+Label units, show the denominator behind percentages, preserve time order, and explain exclusions. A truncated vertical axis can exaggerate small differences. Three-dimensional effects and rainbow palettes add visual noise and can reduce accessibility.
+</div>
+
+## Counts, proportions, risks, and rates
+
+- A **count** is a number of events or people.
+- A **proportion** has a numerator contained within its denominator and ranges from 0 to 1.
+- **Prevalence** is the proportion with an existing condition at a specified time or over a stated period.
+- **Incidence proportion (risk)** is new cases divided by the population initially at risk over a stated period.
+- An **incidence rate** is new cases divided by accumulated person-time at risk.
+- A **ratio** compares two quantities; the numerator need not be part of the denominator.
+
+Always state the population, time window, numerator, and denominator. “The rate was 12%” is ambiguous because percentages usually describe proportions, while rates use person-time units.
+
+```{r category-summary}
+vaccination_counts <- table(ph_data$vaccinated)
+vaccination_summary <- data.frame(
+  Vaccinated = names(vaccination_counts),
+  Count = as.vector(vaccination_counts),
+  Proportion = as.vector(vaccination_counts) / sum(vaccination_counts)
+)
+
+knitr::kable(vaccination_summary, digits = 3,
+             caption = "Vaccination status in the simulated sample")
+```
+
+<details class="knowledge-check">
+<summary>Check your understanding: choose a summary</summary>
+Emergency-department waiting time is strongly right-skewed because a few patients wait many hours. Which pair is most informative: mean/SD or median/IQR?
+
+**Answer:** Median and IQR are usually more representative of the center and spread of a strongly skewed distribution. Reporting selected percentiles or the mean as an additional policy-relevant measure can still be useful if clearly labeled.
+</details>
+
+# Probability and Sampling Variability
+
+## Probability in health questions
+
+A probability ranges from 0 (impossible) to 1 (certain). For an event $A$:
+
+<div class="formula">Complement rule: \(P(A^c) = 1 - P(A)\)</div>
+
+A conditional probability, $P(A \mid B)$, is the probability of $A$ among units for which $B$ is true. This denominator matters. Sensitivity, for example, is the probability of a positive test **among people who truly have the condition**.
+
+Events $A$ and $B$ are independent when learning that one occurred does not change the probability of the other:
+
+<div class="formula">Independence: \(P(A\cap B) = P(A)P(B)\)</div>
+
+Independence is an assumption to justify, not a default. Repeated observations from one person and residents of the same household are often correlated.
+
+## Three useful probability distributions
+
+| Distribution | What it can represent | Key conditions |
+|---|---|---|
+| Binomial | Number infected among a fixed number of similarly exposed people | Fixed trials, two outcomes, common probability, independent trials |
+| Normal | Symmetric continuous measurements or sampling distributions | Bell-shaped approximation with suitable context |
+| Poisson | Event counts in a specified amount of time or space | Events occur at an approximately stable rate; mean and variance relationship may be restrictive |
+
+Real data may violate these conditions. For example, infectious cases cluster and can show more variability than a simple Poisson model allows.
+
+```{r probability-distributions, fig.cap="Examples of binomial, normal, and Poisson probability models. Each model answers a different kind of question.", fig.alt="Three panels display a binomial probability mass function, a bell-shaped normal density, and a Poisson probability mass function."}
+old_par <- par(mfrow = c(1, 3), mar = c(4, 3.8, 2.4, 0.8), las = 1)
+
+x_bin <- 0:12
+plot(x_bin, dbinom(x_bin, size = 12, prob = 0.20), type = "h", lwd = 6,
+     lend = 1, col = palette_ph["blue"],
+     xlab = "Cases among 12", ylab = "Probability", main = "Binomial")
+
+x_norm <- seq(-3.5, 3.5, length.out = 300)
+plot(x_norm, dnorm(x_norm), type = "l", lwd = 3,
+     col = palette_ph["teal"],
+     xlab = "Standardized value", ylab = "Density", main = "Normal")
+
+x_pois <- 0:14
+plot(x_pois, dpois(x_pois, lambda = 4), type = "h", lwd = 6,
+     lend = 1, col = palette_ph["vermillion"],
+     xlab = "Events per day", ylab = "Probability", main = "Poisson")
+
+par(old_par)
+```
+
+## Sampling distributions and standard errors
+
+If we repeatedly draw random samples and calculate an estimate, the estimates form a **sampling distribution**. Its standard deviation is the estimate's **standard error (SE)**. For independent observations from a common population with finite variance, an estimated SE of the sample mean is:
+
+<div class="formula">Estimated standard error: \(\widehat{SE}(\bar{x}) = s/\sqrt{n}\)</div>
+
+The SD describes variability **among observations**. The SE describes uncertainty **in an estimate**. They are not interchangeable.
+
+The sampling distribution is unknown because we have only one sample. A **nonparametric bootstrap** approximates it by repeatedly resampling the observed data, with replacement, using the original sample size. The empirical sample temporarily stands in for the unknown population; this approximation does not correct a biased or unrepresentative sample.
+
+```{r sampling-distribution, fig.cap="The bootstrap distribution of the sample mean is centered near the observed mean. The dashed line marks the observed sample mean.", fig.alt="Histogram of one thousand bootstrap sample means centered near a dashed vertical line marking the observed sample mean."}
+set.seed(410)
+bootstrap_means <- replicate(
+  1000,
+  mean(sample(ph_data$systolic_bp, size = nrow(ph_data), replace = TRUE))
+)
+
+hist(bootstrap_means, breaks = 24, col = palette_ph["sky"], border = "white",
+     main = "Bootstrap distribution of the mean",
+     xlab = "Mean systolic BP in bootstrap samples",
+     ylab = "Bootstrap samples")
+abline(v = mean(ph_data$systolic_bp), col = palette_ph["vermillion"],
+       lwd = 3, lty = 2)
+legend("topright", legend = "Observed sample mean", lty = 2, lwd = 3,
+       col = palette_ph["vermillion"], bty = "n")
+```
+
+Because SE usually decreases in proportion to $1/\sqrt{n}$, quadrupling the sample size approximately halves the SE—not quarters it. The simple formula does not apply unchanged to clustered, paired, weighted, or otherwise dependent observations; the design must be reflected in the SE.
+
+```{r se-scaling}
+se_example <- data.frame(
+  Sample_size = c(25, 100, 400),
+  Assumed_SD = 16,
+  Standard_error = 16 / sqrt(c(25, 100, 400))
+)
+knitr::kable(se_example, digits = 1,
+             caption = "How sample size changes the standard error when SD = 16")
+```
+
+<details class="knowledge-check">
+<summary>Check your understanding: SD or SE?</summary>
+A report says, “Average systolic blood pressure was 128 mmHg (SD 17).” What does 17 describe?
+
+**Answer:** It describes variability among participant blood-pressure values around their sample mean. It does not directly describe uncertainty in the estimated population mean; that role belongs to the standard error.
+</details>
+
+# Estimation and Confidence Intervals
+
+## Point estimates and interval estimates
+
+A **point estimate** is a single best estimate from the data. An **interval estimate** communicates sampling uncertainty. A 95% confidence interval (CI) combines an estimate with its standard error and an appropriate reference distribution.
+
+For a mean under common conditions:
+
+<div class="formula">Estimate ± critical value × standard error</div>
+
+```{r confidence-intervals}
+# A t-based confidence interval for the mean systolic blood pressure.
+n_bp <- sum(!is.na(ph_data$systolic_bp))
+mean_bp <- mean(ph_data$systolic_bp, na.rm = TRUE)
+se_bp <- sd(ph_data$systolic_bp, na.rm = TRUE) / sqrt(n_bp)
+ci_mean_bp <- mean_bp + c(-1, 1) * qt(0.975, df = n_bp - 1) * se_bp
+
+# A score-based interval for the vaccination proportion.
+x_vax <- sum(ph_data$vaccinated == "Yes")
+n_vax <- sum(!is.na(ph_data$vaccinated))
+vax_ci_object <- prop.test(x_vax, n_vax, correct = FALSE)
+vax_estimate <- unname(vax_ci_object$estimate)
+vax_ci <- vax_ci_object$conf.int
+
+ci_table <- data.frame(
+  Quantity = c("Mean systolic BP (mmHg)", "Vaccination proportion"),
+  Estimate = c(mean_bp, vax_estimate),
+  Lower_95_CI = c(ci_mean_bp[1], vax_ci[1]),
+  Upper_95_CI = c(ci_mean_bp[2], vax_ci[2])
+)
+
+knitr::kable(ci_table, digits = 3,
+             caption = "Point and interval estimates from the simulated sample")
+```
+
+<div class="interpretation">
+The estimated mean systolic blood pressure is `r round(mean_bp, 1)` mmHg (95% CI `r round(ci_mean_bp[1], 1)` to `r round(ci_mean_bp[2], 1)`). Under the model and sampling assumptions, the interval describes uncertainty in the population mean—not the range containing 95% of individual blood-pressure values.
+</div>
+
+### What “95% confidence” means
+
+If we repeatedly used the same valid sampling and interval procedure, about 95% of the resulting intervals would contain the true parameter. After one interval is computed, the parameter is fixed; in the standard frequentist interpretation we do not say there is a 95% probability that this particular interval contains it.
+
+CI width reflects random uncertainty under a model. It does **not** automatically include selection bias, measurement error, uncontrolled confounding, model misspecification, or data-processing mistakes.
+
+<div class="callout pitfall">
+<span class="callout-title">Intervals are not pass/fail devices</span>
+A narrow interval around a trivial effect can be unimportant; a wide interval may contain both meaningful benefit and harm. Interpret the estimate, interval limits, units, study design, and public health context together.
+</div>
+
+<details class="knowledge-check">
+<summary>Check your understanding: interpret a 95% CI</summary>
+A risk difference is −4 percentage points with a 95% CI from −9 to +1 points. What is a careful interpretation?
+
+**Answer:** The data are compatible with effects ranging from a meaningful reduction to a small increase, under the assumptions. Because the interval includes zero, the data do not reject a zero difference at the two-sided 5% level, but “no statistically significant difference” is not proof of no effect.
+</details>
+
+# Hypothesis Testing and Group Comparisons
+
+## Null hypotheses and p-values
+
+A hypothesis test begins with a **null hypothesis** $H_0$, often no difference or no association, and an alternative $H_A$. A p-value is:
+
+> the probability, assuming the null hypothesis and model assumptions are true, of obtaining data at least as incompatible with the null as the observed data.
+
+A p-value is **not** the probability that the null hypothesis is true, the probability that results occurred “by chance,” or the size of an effect.
+
+- A **Type I error** is rejecting a true null hypothesis.
+- A **Type II error** is failing to reject a false null hypothesis.
+- **Power** is the probability of rejecting the null for a specified true effect under a specified design.
+
+Power depends on sample size, variability, effect size, outcome frequency, design, missingness, and the chosen significance threshold. It should be planned before data collection when possible.
+
+## A Welch two-sample t-test
+
+Welch's t-test is a sensible default for comparing two independent means because it does not assume equal group variances. Here it compares mean systolic blood pressure by current smoking status.
+
+```{r welch-test}
+bp_test <- t.test(systolic_bp ~ smoking_status, data = ph_data)
+bp_means <- aggregate(systolic_bp ~ smoking_status, data = ph_data, mean)
+bp_means
+bp_test
+```
+
+<div class="interpretation">
+The estimated mean difference is `r round(diff(bp_test$estimate), 1)` mmHg when expressed as current minus not-current smoking. The two-sided p-value is `r format.pval(bp_test$p.value, digits = 3)`. This simulated, observational comparison is an association; it does not show that smoking caused the difference, because other characteristics may differ between groups.
+</div>
+
+### Choose a method from the question and design
+
+| Question | Common introductory method | Important check |
+|---|---|---|
+| Compare two independent means | Welch two-sample t-test | Independent units; distribution and influential observations |
+| Compare paired before/after measurements | Paired t-test on within-person differences | Pairing is correct; distribution of differences |
+| Compare two categorical variables | Chi-square test of independence | Expected cell counts; use Fisher's exact test when sparse |
+| Compare ordered or highly skewed outcomes | Rank-based method when appropriate | A rank-sum test is not automatically a test of medians |
+| Estimate an adjusted continuous association | Linear regression | Functional form, residual patterns, influential observations |
+| Estimate an adjusted binary association | Logistic regression | Correct specification, sparse data, odds-ratio interpretation |
+
+<div class="callout pitfall">
+<span class="callout-title">Statistical significance is not public health importance</span>
+Large samples can make small effects yield small p-values. Small studies can miss important effects. Report the effect estimate, confidence interval, units, absolute risk when possible, assumptions, and consequences—not only whether p &lt; 0.05.
+</div>
+
+Multiple testing also matters. If many hypotheses are tested, false-positive findings become more likely. Pre-specify primary questions, limit opportunistic testing, and use multiplicity methods when the scientific setting calls for them.
+
+<details class="knowledge-check">
+<summary>Check your understanding: interpret p = 0.03</summary>
+Which is correct: “There is a 3% probability that the null hypothesis is true,” or “If the null and model assumptions were true, results at least this incompatible with the null would occur about 3% of the time”?
+
+**Answer:** The second statement. The first incorrectly treats the p-value as $P(H_0 \mid data)$. A p-value does not supply that probability.
+</details>
+
+# Frequency and Association Measures
+
+## A cohort-style 2×2 table
+
+Suppose 240 workers are followed through one respiratory-outbreak period.
+
+|  | Ill | Not ill | Total |
+|---|---:|---:|---:|
+| Exposed | $a=48$ | $b=72$ | 120 |
+| Unexposed | $c=24$ | $d=96$ | 120 |
+
+The group risks are:
+
+<div class="formula">Exposed risk = \(a/(a+b)\); unexposed risk = \(c/(c+d)\)</div>
+
+Three common association measures answer different questions:
+
+<div class="formula">Risk difference: \(RD = a/(a+b) - c/(c+d)\)</div>
+
+<div class="formula">Risk ratio: \(RR = [a/(a+b)]/[c/(c+d)]\)</div>
+
+<div class="formula">Odds ratio: \(OR = ad/(bc)\)</div>
+
+```{r two-by-two}
+a <- 48; b <- 72; c <- 24; d <- 96
+risk_exposed <- a / (a + b)
+risk_unexposed <- c / (c + d)
+risk_difference <- risk_exposed - risk_unexposed
+risk_ratio <- risk_exposed / risk_unexposed
+odds_ratio <- (a * d) / (b * c)
+
+# Large-sample confidence intervals for teaching purposes.
+se_rd <- sqrt(risk_exposed * (1 - risk_exposed) / (a + b) +
+                risk_unexposed * (1 - risk_unexposed) / (c + d))
+ci_rd <- risk_difference + c(-1, 1) * 1.96 * se_rd
+
+se_log_rr <- sqrt(1 / a - 1 / (a + b) + 1 / c - 1 / (c + d))
+ci_rr <- exp(log(risk_ratio) + c(-1, 1) * 1.96 * se_log_rr)
+
+se_log_or <- sqrt(1 / a + 1 / b + 1 / c + 1 / d)
+ci_or <- exp(log(odds_ratio) + c(-1, 1) * 1.96 * se_log_or)
+
+effect_table <- data.frame(
+  Measure = c("Risk difference", "Risk ratio", "Odds ratio"),
+  Estimate = c(risk_difference, risk_ratio, odds_ratio),
+  Lower_95_CI = c(ci_rd[1], ci_rr[1], ci_or[1]),
+  Upper_95_CI = c(ci_rd[2], ci_rr[2], ci_or[2])
+)
+
+knitr::kable(effect_table, digits = 2,
+             caption = "Unadjusted association measures for the outbreak example")
+```
+
+<div class="interpretation">
+Illness risk was 40% in exposed workers and 20% in unexposed workers. The estimated risk difference was 20 percentage points, or 20 additional cases per 100 workers over this outbreak period. The risk ratio was 2.0: exposed workers had twice the observed risk. The odds ratio was 2.67 and should not be mislabeled as a risk ratio.
+</div>
+
+### Choosing an association measure
+
+- **Risk difference** expresses absolute excess or reduction and is often directly useful for program planning.
+- **Risk ratio** expresses relative risk over the defined period.
+- **Odds ratio** compares odds. It naturally arises from logistic regression and case-control sampling.
+- When an outcome is uncommon, the odds ratio may approximate the risk ratio. When the outcome is common, the values can differ substantially.
+
+These calculations are unadjusted. Confounding, clustering, censoring, unequal follow-up, and complex sampling can require other methods.
+
+<details class="knowledge-check">
+<summary>Check your understanding: absolute versus relative effect</summary>
+An intervention reduces risk from 2% to 1%. What are the risk difference and risk ratio?
+
+**Answer:** The risk difference is −1 percentage point (1% − 2%); the risk ratio is 0.50 (1% / 2%), a 50% relative reduction. Both are correct but communicate different information.
+</details>
+
+# Screening and Diagnostic Tests
+
+## Test performance requires a reference standard
+
+Consider a screening program for 1,000 people. A reference standard identifies 80 people with the condition. The screening test gives the following results:
+
+|  | Condition present | Condition absent | Total |
+|---|---:|---:|---:|
+| Test positive | TP = 68 | FP = 92 | 160 |
+| Test negative | FN = 12 | TN = 828 | 840 |
+| Total | 80 | 920 | 1,000 |
+
+<div class="formula">Sensitivity = \(TP/(TP+FN)\); specificity = \(TN/(TN+FP)\)</div>
+
+<div class="formula">PPV = \(TP/(TP+FP)\); NPV = \(TN/(TN+FN)\)</div>
+
+```{r screening-measures}
+tp <- 68; fp <- 92; fn <- 12; tn <- 828
+screening <- data.frame(
+  Measure = c("Sensitivity", "Specificity", "Positive predictive value",
+              "Negative predictive value"),
+  Estimate = c(tp / (tp + fn), tn / (tn + fp),
+               tp / (tp + fp), tn / (tn + fn))
+)
+knitr::kable(screening, digits = 3,
+             caption = "Screening performance in the hypothetical program")
+```
+
+<div class="interpretation">
+Sensitivity is 85% and specificity is 90%. Among those who test positive, however, only 42.5% have the condition (PPV). The difference occurs because the condition prevalence in this screened population is 8% and false positives accumulate among the much larger condition-absent group.
+</div>
+
+## Predictive value changes with prevalence
+
+For fixed sensitivity and specificity, PPV generally rises as prevalence rises, while NPV generally falls.
+
+```{r predictive-value-plot, fig.cap="Even with fixed sensitivity of 85% and specificity of 90%, predictive values change as condition prevalence changes.", fig.alt="A line chart shows positive predictive value increasing and negative predictive value decreasing as prevalence rises."}
+prevalence_grid <- seq(0.01, 0.50, by = 0.01)
+sens <- 0.85
+spec <- 0.90
+ppv_grid <- sens * prevalence_grid /
+  (sens * prevalence_grid + (1 - spec) * (1 - prevalence_grid))
+npv_grid <- spec * (1 - prevalence_grid) /
+  ((1 - sens) * prevalence_grid + spec * (1 - prevalence_grid))
+
+plot(prevalence_grid, ppv_grid, type = "l", lwd = 3,
+     col = palette_ph["vermillion"], ylim = c(0, 1),
+     xlab = "Condition prevalence", ylab = "Predictive value",
+     main = "Predictive values depend on prevalence")
+lines(prevalence_grid, npv_grid, lwd = 3, lty = 2,
+      col = palette_ph["blue"])
+legend("right", legend = c("PPV", "NPV"), lwd = 3, lty = c(1, 2),
+       col = c(palette_ph["vermillion"], palette_ph["blue"]), bty = "n")
+```
+
+A threshold that increases sensitivity usually reduces specificity, and vice versa. The preferred trade-off depends on the consequences of missed cases, false alarms, follow-up resources, and equity. Sensitivity and specificity can also vary across populations because of disease spectrum and verification processes.
+
+<details class="knowledge-check">
+<summary>Check your understanding: which denominator?</summary>
+To calculate sensitivity, should the denominator be all positive tests or all people who truly have the condition?
+
+**Answer:** All people who truly have the condition, (TP+FN). The proportion of positive tests that are true positives is PPV, which uses (TP+FP) as its denominator.
+</details>
+
+# Correlation and Regression Basics
+
+## Correlation is a description, not a causal claim
+
+Pearson correlation summarizes the strength of a linear relationship between two numeric variables. Spearman correlation summarizes a monotonic rank relationship. Both can be altered by outliers, restricted ranges, mixed subgroups, and nonlinear patterns.
+
+```{r scatterplot, fig.cap="Systolic blood pressure tends to increase with age in the simulated data, but individuals vary substantially.", fig.alt="Scatterplot of systolic blood pressure against age with a fitted straight line sloping upward."}
+plot(ph_data$age, ph_data$systolic_bp,
+     pch = 16, cex = 0.65, col = rgb(0, 114/255, 178/255, 0.38),
+     xlab = "Age (years)", ylab = "Systolic blood pressure (mmHg)",
+     main = "Age and systolic blood pressure")
+abline(lm(systolic_bp ~ age, data = ph_data),
+       col = palette_ph["vermillion"], lwd = 3)
+```
+
+The Pearson correlation is `r round(cor(ph_data$age, ph_data$systolic_bp), 2)`. That value does not prove that changing age would change blood pressure by any particular amount. Causal interpretation requires a defensible design and assumptions beyond correlation.
+
+## Linear regression for a continuous outcome
+
+A multiple linear model can describe mean systolic blood pressure as a function of several covariates:
+
+<div class="formula">\(E(Y\mid X) = \beta_0 + \beta_1X_1 + \beta_2X_2 + \cdots\)</div>
+
+```{r linear-regression}
+bp_model <- lm(systolic_bp ~ age + bmi + smoking_status, data = ph_data)
+coef_table <- summary(bp_model)$coefficients
+knitr::kable(coef_table, digits = 3,
+             caption = "Linear regression of systolic blood pressure")
+```
+
+<div class="interpretation">
+The age coefficient is `r round(coef(bp_model)["age"], 2)` mmHg per year. In this model, participants who differ by one year in age but have the same modeled BMI and smoking status differ in mean systolic blood pressure by about `r abs(round(coef(bp_model)["age"], 2))` mmHg. The coefficient is an adjusted association, not automatically a causal effect.
+</div>
+
+Checks should include residual patterns, linearity, influential observations, dependence, and whether a linear mean model makes scientific sense. A large sample does not rescue the wrong functional form.
+
+## Logistic regression for a binary outcome
+
+Logistic regression models the log odds of a binary outcome. Exponentiating a coefficient gives an **odds ratio**, not a risk ratio.
+
+```{r logistic-regression}
+infection_model <- glm(
+  respiratory_infection ~ vaccinated + age + smoking_status + neighborhood,
+  data = ph_data,
+  family = binomial()
+)
+
+model_coef <- summary(infection_model)$coefficients
+non_intercept <- rownames(model_coef) != "(Intercept)"
+or_table <- data.frame(
+  Term = rownames(model_coef)[non_intercept],
+  Odds_ratio = exp(model_coef[non_intercept, "Estimate"]),
+  Lower_95_CI = exp(model_coef[non_intercept, "Estimate"] -
+                      1.96 * model_coef[non_intercept, "Std. Error"]),
+  Upper_95_CI = exp(model_coef[non_intercept, "Estimate"] +
+                      1.96 * model_coef[non_intercept, "Std. Error"]),
+  P_value = model_coef[non_intercept, "Pr(>|z|)"],
+  row.names = NULL
+)
+
+knitr::kable(or_table, digits = 3,
+             caption = "Adjusted odds ratios for respiratory infection (intercept omitted)")
+```
+
+<div class="interpretation">
+The adjusted odds ratio comparing vaccinated with unvaccinated participants is `r round(or_table$Odds_ratio[or_table$Term == "vaccinatedYes"], 2)` (95% CI `r round(or_table$Lower_95_CI[or_table$Term == "vaccinatedYes"], 2)` to `r round(or_table$Upper_95_CI[or_table$Term == "vaccinatedYes"], 2)`). It describes a conditional association in this simulated model. It is not an adjusted risk ratio and does not by itself establish vaccine effectiveness.
+</div>
+
+Categorical terms compare the displayed factor level with its reference level; the age odds ratio is for a one-year difference. The exponentiated intercept is a baseline odds, not an odds ratio, so it is intentionally omitted from the table.
+
+<div class="callout pitfall">
+<span class="callout-title">Adjustment is not magic</span>
+Do not select covariates only because their univariable p-values are small. Pre-specify variables using subject-matter knowledge and a causal framework. Avoid adjusting for consequences of the exposure when estimating a total effect, and remember that unmeasured or poorly measured confounding can remain.
+</div>
+
+### Effect modification
+
+An association can genuinely differ across subgroups or contexts. This is **effect modification** or interaction, not necessarily bias. Assess it on a scientifically meaningful scale, pre-specify key subgroup questions, and report subgroup estimates with uncertainty rather than comparing which subgroup p-value crosses 0.05.
+
+<details class="knowledge-check">
+<summary>Check your understanding: interpret an odds ratio</summary>
+A logistic model gives an adjusted odds ratio of 0.70 for an intervention versus comparison. Can you say risk is 30% lower?
+
+**Answer:** Not without additional information or a method that estimates risks. The odds are 30% lower because $1-0.70=0.30$. The risk ratio may be similar when the outcome is uncommon, but odds and risks can differ substantially for common outcomes.
+</details>
+
+# Reproducibility, Equity, and Ethics
+
+## A reproducible analysis trail
+
+A defensible analysis should let another analyst understand what was done and reproduce the result.
+
+1. Preserve raw data as read-only and document its source and version.
+2. Use a data dictionary with definitions, units, allowed values, and missing-value codes.
+3. Script cleaning and analysis instead of relying on undocumented clicks.
+4. Record exclusions and denominators at each stage.
+5. Set random seeds for simulation or randomized algorithms.
+6. Report software and package versions when relevant.
+7. Separate exploratory work from confirmatory analyses.
+8. Protect identifiers, small cells, locations, and sensitive attributes.
+
+```{r reproducibility-check}
+# Compact checks that should precede modeling.
+data_quality <- data.frame(
+  Check = c("Rows", "Duplicate participant IDs", "Missing activity values",
+            "Age outside 18–85", "Systolic BP outside 70–250"),
+  Result = c(
+    nrow(ph_data),
+    sum(duplicated(ph_data$participant_id)),
+    sum(is.na(ph_data$physical_activity_min_week)),
+    sum(ph_data$age < 18 | ph_data$age > 85),
+    sum(ph_data$systolic_bp < 70 | ph_data$systolic_bp > 250)
+  )
+)
+knitr::kable(data_quality, caption = "Selected reproducible data-quality checks")
+```
+
+## Missing data are part of the question
+
+Ask why values are missing, whether missingness differs across groups, and what assumptions an analysis makes. Complete-case analysis can reduce precision and introduce bias. Never silently convert missing values to zero or automatically delete rows without reporting the effect.
+
+More advanced options include multiple imputation, inverse-probability weighting, likelihood-based methods, and sensitivity analysis. Their validity depends on assumptions that should be stated and examined.
+
+## Equity and responsible interpretation
+
+<div class="callout ethics">
+<span class="callout-title">Health data represent people and systems</span>
+Protect privacy, avoid stigmatizing language, explain how categories were defined, and include communities in decisions about collection and reporting. A technically correct model can still cause harm when the question, labels, or use of results are inappropriate.
+</div>
+
+Race and ethnicity variables usually reflect social, political, historical, and measurement processes; they should not be treated as simple biological causes. When disparities are observed, investigate structural conditions, access, discrimination, environment, and measurement practices. Avoid publishing small cells that could identify people, especially when geography and rare conditions are combined.
+
+Survey weights, stratification, clustering, repeated measurements, multilevel structures, time-to-event outcomes, spatial correlation, and causal estimands often require methods beyond this introductory guide. The correct next step is to recognize the structure and seek an appropriate method—not to ignore it.
+
+<details class="knowledge-check">
+<summary>Check your understanding: review a reporting choice</summary>
+A map shows exact home locations for six people with a rare infection. What is the primary concern?
+
+**Answer:** Re-identification and privacy risk. Aggregate or mask geography, apply disclosure-control rules, and involve data stewards and affected communities before release. Public benefit does not remove the obligation to protect participants.
+</details>
+
+# Guided Mini Case Study
+
+## Question and design
+
+**Question:** In the simulated community sample, is vaccination associated with a lower observed 12-week risk of respiratory infection?
+
+For teaching, we treat the sample as a cohort observed over a common period. The analysis is unadjusted first, then interpreted alongside the adjusted logistic model above. Because the data are simulated and observational, this is not an estimate of real-world effectiveness.
+
+## Step 1: Check denominators and create the 2×2 table
+
+```{r mini-case-table}
+vax_table <- with(
+  ph_data,
+  table(Vaccinated = vaccinated, Infection = respiratory_infection)
+)
+vax_table
+
+risk_vaccinated <- vax_table["Yes", "Yes"] / sum(vax_table["Yes", ])
+risk_unvaccinated <- vax_table["No", "Yes"] / sum(vax_table["No", ])
+rd_vax <- risk_vaccinated - risk_unvaccinated
+rr_vax <- risk_vaccinated / risk_unvaccinated
+
+a_v <- unname(vax_table["Yes", "Yes"])
+b_v <- unname(vax_table["Yes", "No"])
+c_v <- unname(vax_table["No", "Yes"])
+d_v <- unname(vax_table["No", "No"])
+se_log_rr_vax <- sqrt(1 / a_v - 1 / (a_v + b_v) +
+                        1 / c_v - 1 / (c_v + d_v))
+ci_rr_vax <- exp(log(rr_vax) + c(-1, 1) * 1.96 * se_log_rr_vax)
+
+se_rd_vax <- sqrt(
+  risk_vaccinated * (1 - risk_vaccinated) / (a_v + b_v) +
+    risk_unvaccinated * (1 - risk_unvaccinated) / (c_v + d_v)
+)
+ci_rd_vax <- rd_vax + c(-1, 1) * 1.96 * se_rd_vax
+
+ci_risk_vaccinated <- prop.test(a_v, a_v + b_v, correct = FALSE)$conf.int
+ci_risk_unvaccinated <- prop.test(c_v, c_v + d_v, correct = FALSE)$conf.int
+
+mini_results <- data.frame(
+  Measure = c("Risk among vaccinated", "Risk among unvaccinated",
+              "Risk difference", "Risk ratio"),
+  Estimate = c(risk_vaccinated, risk_unvaccinated, rd_vax, rr_vax),
+  Lower_95_CI = c(ci_risk_vaccinated[1], ci_risk_unvaccinated[1],
+                  ci_rd_vax[1], ci_rr_vax[1]),
+  Upper_95_CI = c(ci_risk_vaccinated[2], ci_risk_unvaccinated[2],
+                  ci_rd_vax[2], ci_rr_vax[2])
+)
+knitr::kable(mini_results, digits = 3,
+             caption = "Unadjusted estimates and 95% confidence intervals in the simulated mini case study")
+```
+
+The two risks use score intervals. The risk-difference interval uses a simple large-sample normal approximation, and the risk-ratio interval uses a large-sample log approximation; these teaching methods may be unsuitable for sparse data.
+
+## Step 2: Visualize absolute risk
+
+```{r mini-case-plot, fig.cap="Observed infection risk was lower among vaccinated participants in the simulated dataset.", fig.alt="Two-bar chart comparing respiratory infection risk for unvaccinated and vaccinated participants, with percentages labeled above each bar."}
+risks <- c(Unvaccinated = risk_unvaccinated, Vaccinated = risk_vaccinated)
+bar_positions <- barplot(
+  risks,
+  ylim = c(0, max(risks) * 1.30),
+  col = c(palette_ph["orange"], palette_ph["teal"]),
+  border = NA,
+  ylab = "Observed 12-week infection risk",
+  main = "Respiratory infection risk by vaccination status",
+  las = 1
+)
+text(bar_positions, risks, labels = pct(risks), pos = 3, font = 2)
+```
+
+## Step 3: Report estimates in context
+
+<div class="interpretation">
+Among `r sum(ph_data$vaccinated == "Yes")` vaccinated participants, the observed infection risk was `r pct(risk_vaccinated)`, compared with `r pct(risk_unvaccinated)` among `r sum(ph_data$vaccinated == "No")` unvaccinated participants. The unadjusted risk ratio was `r round(rr_vax, 2)` (95% CI `r round(ci_rr_vax[1], 2)` to `r round(ci_rr_vax[2], 2)`), and the risk difference was `r round(100 * rd_vax, 1)` percentage points (95% CI `r round(100 * ci_rd_vax[1], 1)` to `r round(100 * ci_rd_vax[2], 1)`). In this simulated sample, vaccination was associated with lower infection risk. Because vaccination was not randomized, differences in access, age, neighborhood, health behavior, or other factors may affect the association; this result should not be interpreted as proof of causation.
+</div>
+
+### A four-sentence reporting template
+
+> Among **[population]**, the estimated **[outcome]** was **[estimate]** in group 1 and **[estimate]** in group 0. The estimated **[risk difference/risk ratio/mean difference]** was **[value]** with a 95% CI of **[lower, upper]**. This suggests **[plain-language interpretation with units and time]**. Because the data were **[design]**, **[specific limitation]** may affect the estimate and causation should not be assumed.
+
+<details class="knowledge-check">
+<summary>Mini-case reflection</summary>
+Why might the unadjusted risk ratio and adjusted odds ratio differ?
+
+**Answer:** They are different measures (risk ratio versus odds ratio), and the adjusted model conditions on age, smoking status, and neighborhood. Differences can therefore reflect both the measure's scale and covariate adjustment. Model specification, sparse subgroups, and sampling variation can also contribute.
+</details>
+
+# Quick Reference
+
+## Core formulas
+
+| Quantity | Formula | Interpretation |
+|---|---|---|
+| Prevalence | Existing cases / defined population | Proportion with a condition at a specified time or period |
+| Incidence proportion | New cases / population initially at risk | Risk over a defined period |
+| Incidence rate | New cases / person-time at risk | Speed of new-event occurrence |
+| Risk difference | $p_1-p_0$ | Absolute excess or reduction |
+| Risk ratio | $p_1/p_0$ | Relative risk |
+| Odds ratio | $ad/bc$ in a 2×2 table | Ratio of group odds |
+| Estimated SE of a mean | $s/\sqrt{n}$ | Estimated sampling variability of a mean |
+| Approximate SE of a proportion | \(\sqrt{\hat p(1-\hat p)/n}\) | Simple large-sample uncertainty approximation |
+| Sensitivity | $TP/(TP+FN)$ | Positive test among those with the condition |
+| Specificity | $TN/(TN+FP)$ | Negative test among those without the condition |
+| PPV | $TP/(TP+FP)$ | Condition present among positive tests |
+| NPV | $TN/(TN+FN)$ | Condition absent among negative tests |
+
+For small samples or proportions close to 0 or 1, basic Wald intervals can perform poorly. Score/Wilson or exact methods are often preferable, depending on the goal.
+
+## Method selection checklist
+
+Before choosing a method, ask:
+
+- What is the target population and estimand?
+- What is the outcome type?
+- Are observations independent, paired, clustered, repeated, censored, or survey-weighted?
+- How were participants and variables measured?
+- Are important values missing?
+- What distributional or modeling assumptions are required?
+- Which effect scale is understandable and decision-relevant?
+- What sources of bias remain even if the computation is correct?
+
+## Plain-language glossary
+
+| Term | Meaning |
+|---|---|
+| Bias | A systematic tendency for an estimate to differ from the target quantity |
+| Confidence interval | A range produced by a procedure designed to quantify sampling uncertainty |
+| Confounder | A variable that can create or distort an association because of the causal structure |
+| Estimate | A sample-based approximation of a target parameter |
+| Estimand | The precisely defined quantity the analysis aims to estimate |
+| Generalizability | How well findings apply to a target population or setting |
+| Precision | How little random variability an estimate has; often reflected by CI width |
+| p-value | A measure of data compatibility with a null hypothesis under model assumptions |
+| Standard deviation | Variation among observed values |
+| Standard error | Estimated sampling variability of a statistic |
+
+# Final Knowledge Check
+
+1. Which measure uses person-time in its denominator?
+2. Why is a sample mean a statistic rather than a parameter?
+3. What is the difference between an SD and an SE?
+4. Does a 95% CI contain 95% of individual observations?
+5. Can p = 0.20 prove that two populations are identical?
+6. When can an odds ratio differ substantially from a risk ratio?
+7. Why does PPV often fall when disease prevalence falls?
+8. Does multivariable adjustment guarantee a causal effect?
+
+<details class="knowledge-check">
+<summary>Reveal the final answers</summary>
+
+1. An incidence rate uses person-time at risk.
+2. It is calculated from a sample; the population mean is the parameter.
+3. SD describes variability among observations; SE describes uncertainty in an estimate.
+4. No. A CI concerns uncertainty in a parameter estimate, not the distribution of individual values.
+5. No. Failure to reject a null is not proof that groups are identical; consider the estimate, CI, power, and a meaningful equivalence margin.
+6. When the outcome is common. An odds ratio can be farther from 1 than the corresponding risk ratio.
+7. With fewer true cases, false positives can make up a larger share of all positive tests, even if sensitivity and specificity stay fixed.
+8. No. Causal interpretation also requires an appropriate design, correct temporal ordering, adequate measurement, model specification, and defensible no-unmeasured-confounding and other assumptions.
+
+</details>
+
+## Where to go next {-}
+
+Next topics for public health training include sample-size planning, survey weights and design effects, generalized linear models, longitudinal and multilevel data, survival analysis, spatial methods, causal inference, Bayesian methods, missing-data methods, and transparent reporting guidelines.
+
+<div class="footer-note">
+<strong>Educational use:</strong> This module introduces statistical reasoning and does not replace consultation with a biostatistician for high-stakes research or policy decisions. All data and numerical findings are simulated. The source R Markdown file can be downloaded using the button at the top of this page.
+</div>

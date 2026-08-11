@@ -1,0 +1,1116 @@
+---
+title: "公共卫生生物统计学基础"
+subtitle: "含可重复 R 示例的入门指南"
+author: "公共卫生学院学习模块"
+date: "更新于 `r format(Sys.Date(), '%Y年%m月%d日')`"
+lang: zh-CN
+output:
+  html_document:
+    self_contained: true
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+      print: true
+    number_sections: true
+    anchor_sections: true
+    code_folding: show
+    code_download: true
+    fig_caption: true
+    df_print: kable
+    math_method: mathml
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center",
+  fig.width = 8,
+  fig.height = 4.7,
+  fig.retina = 2,
+  out.width = "100%"
+)
+
+options(stringsAsFactors = FALSE, digits = 3, width = 82)
+
+# A color-blind-friendly palette (Okabe-Ito inspired).
+palette_ph <- c(
+  navy = "#17324D",
+  teal = "#0B6B66",
+  blue = "#0072B2",
+  orange = "#E69F00",
+  vermillion = "#D55E00",
+  purple = "#CC79A7",
+  sky = "#56B4E9",
+  green = "#009E73"
+)
+
+# Create one reproducible, simulated public health dataset.
+set.seed(20260810)
+n <- 520
+age <- round(pmin(pmax(rnorm(n, mean = 45, sd = 16), 18), 85))
+neighborhood <- sample(
+  c("Central", "North", "South", "West"), n, replace = TRUE,
+  prob = c(0.29, 0.23, 0.27, 0.21)
+)
+smoking <- rbinom(n, 1, plogis(-1.55 + 0.012 * (age - 40)))
+access_to_care <- rbinom(
+  n, 1,
+  plogis(0.8 - 0.55 * (neighborhood == "North") +
+           0.20 * (neighborhood == "Central"))
+)
+vaccinated_num <- rbinom(
+  n, 1,
+  plogis(-0.55 + 0.022 * age + 0.75 * access_to_care)
+)
+bmi <- round(pmin(pmax(rnorm(n, 26 + 1.1 * smoking, 4.5), 16), 48), 1)
+physical_activity <- pmax(0, round(rgamma(n, shape = 2.4, scale = 55) - 15))
+systolic_bp <- round(
+  101 + 0.52 * age + 0.42 * (bmi - 25) + 4.5 * smoking + rnorm(n, 0, 11)
+)
+infection_num <- rbinom(
+  n, 1,
+  plogis(-1.05 - 0.85 * vaccinated_num + 0.55 * smoking +
+           0.30 * (neighborhood == "North"))
+)
+
+# Include a small amount of missingness for teaching purposes.
+physical_activity[sample(seq_len(n), 18)] <- NA
+
+ph_data <- data.frame(
+  participant_id = sprintf("P%03d", seq_len(n)),
+  age = age,
+  neighborhood = factor(neighborhood),
+  smoking_status = factor(
+    ifelse(smoking == 1, "Current", "Not current"),
+    levels = c("Not current", "Current")
+  ),
+  physical_activity_min_week = physical_activity,
+  bmi = bmi,
+  systolic_bp = systolic_bp,
+  access_to_care = factor(
+    ifelse(access_to_care == 1, "Yes", "No"),
+    levels = c("No", "Yes")
+  ),
+  vaccinated = factor(
+    ifelse(vaccinated_num == 1, "Yes", "No"),
+    levels = c("No", "Yes")
+  ),
+  respiratory_infection = factor(
+    ifelse(infection_num == 1, "Yes", "No"),
+    levels = c("No", "Yes")
+  )
+)
+
+pct <- function(x, digits = 1) paste0(formatC(100 * x, digits = digits, format = "f"), "%")
+```
+
+<nav class="language-switch" aria-label="语言选择">
+  <a class="language-home" href="biostatistics_bilingual.html">中英双语入口</a>
+  <a class="language-option" href="biostatistics_foundations.html" lang="en">English</a>
+  <span class="language-option active" aria-current="page">中文</span>
+</nav>
+
+<script>
+(function () {
+  const labels = {
+    "Show All Code": "显示全部代码",
+    "Hide All Code": "隐藏全部代码",
+    "View Source": "查看源文件",
+    "Download Rmd": "下载 Rmd"
+  };
+
+  function localizeCodeControls() {
+    document.querySelectorAll(".dropdown-menu a")
+      .forEach(function (element) {
+        const text = element.textContent.trim();
+        if (labels[text]) element.textContent = labels[text];
+      });
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    localizeCodeControls();
+    new MutationObserver(localizeCodeControls).observe(document.body, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+  });
+})();
+</script>
+
+<div class="module-bar">
+  <div class="module-stat"><strong>适用对象</strong><span>公共卫生硕士一年级学生及公共卫生专业学生</span></div>
+  <div class="module-stat"><strong>学习时长</strong><span>约 90–120 分钟</span></div>
+  <div class="module-stat"><strong>先修要求</strong><span>掌握基本算术；无需微积分基础</span></div>
+</div>
+
+<div class="callout note">
+<span class="callout-title">关于数据</span>
+本指南中的所有记录和结果均为模拟数据。所有示例均可重复生成，且不包含任何可识别个人身份的健康信息。模拟出的关联仅用于教学，不能作为真实人群的证据。
+</div>
+
+## 如何使用本指南 {-}
+
+各章均遵循相同的学习脉络：**为何这一概念重要**、**核心概念**、**公共卫生示例**、**R 代码**以及**结果解读检查**。请先阅读讲解，再运行或调整代码，最后展开答案面板。代码默认显示，可通过页面上的代码折叠按钮收起。
+
+你不必记住每一个公式。请着重培养以下三个习惯：
+
+1. 将方法与定义明确的公共卫生问题相联系；
+2. 说明所作假设与不确定性；
+3. 解读效应的大小和方向，而非只关注 p 值。
+
+### 学习目标 {-}
+
+完成本模块后，你应能够：
+
+- 区分总体、样本、参数、统计量和目标估计量；
+- 识别常见研究设计、变量类型及主要偏倚来源；
+- 恰当地汇总健康数据并将其可视化；
+- 计算并解读基本的频率、关联及筛查指标；
+- 解释抽样变异、标准误、置信区间和 p 值；
+- 选择常见的组间比较方法；
+- 在不作缺乏依据的因果推断的前提下，解读简单线性回归和逻辑回归结果；
+- 清晰、可重复且符合伦理地交流研究发现。
+
+# 从问题到证据
+
+## 生物统计学为何重要
+
+**生物统计学**将统计推理应用于健康、疾病、卫生服务和人群相关问题。它并非一系列检验方法的简单集合，而是一条严谨的路径：从问题出发，形成证据，再据此作出审慎恰当的决策。
+
+<div class="takeaway-grid">
+  <div class="takeaway-card"><h4>描述</h4><p>存在哪些健康事件、暴露和分布模式？</p></div>
+  <div class="takeaway-card"><h4>比较</h4><p>具有实际意义的组别或时间段之间差异有多大？</p></div>
+  <div class="takeaway-card"><h4>在不确定性中学习</h4><p>样本能够告诉我们目标总体的哪些信息？</p></div>
+</div>
+
+一个实用的工作流程是：
+
+> **问题 → 设计 → 测量 → 数据检查 → 描述 → 估计 → 不确定性 → 解读 → 行动**
+
+统计方法无法弥补问题定义模糊、抽样有偏或测量质量低下等缺陷。这些关键决策早在计算 p 值之前就已作出。
+
+## 总体、样本、参数、统计量与目标估计量
+
+假设某城市调查了 520 名成年人，以估计流感疫苗接种覆盖率。
+
+| 术语 | 含义 | 示例 |
+|---|---|---|
+| **目标总体** | 研究问题所指向的完整群体 | 本季居住在该市、未居住于机构中的所有成年人 |
+| **样本** | 实际观察到的人群 | 参与调查的 520 人 |
+| **参数** | 固定但通常未知的总体数量特征 | 所有目标成年人中的真实疫苗接种比例 |
+| **统计量／估计值** | 根据样本计算得到的数量特征 | 调查中观察到的疫苗接种比例 |
+| **目标估计量** | 对拟估计对象的精确定义 | 本季目标总体中的疫苗接种覆盖率 |
+
+**观察单位**同样至关重要。数据表中的一行可能代表一个人、一个家庭、一家诊所、一个社区或一个人日。所用方法必须与该观察单位相匹配，并妥善处理可能存在的聚集性。
+
+### 将主题转化为可回答的问题
+
+在打开 R 之前，请先明确写出：
+
+- **总体：**目标是谁或什么？
+- **暴露或干预：**要比较的是哪种状况、项目或行为？
+- **结局：**研究的是哪项健康指标？它如何定义？
+- **比较：**与谁、什么或哪个时间点进行比较？
+- **时间：**是在某一时点、某一时间段内，还是直至某事件发生？
+- **目标估计量：**是患病率、风险差、风险比、均值差、率比，还是其他数量？
+
+<div class="callout">
+<span class="callout-title">问题示例</span>
+在冬季开始时居住于该市的成年人中（总体），已接种疫苗者与未接种疫苗者相比（比较），12 周内发生实验室确诊呼吸道感染（结局）的风险是多少？结果以风险比表示（目标估计量）。
+</div>
+
+<details class="knowledge-check">
+<summary>检查理解：识别参数</summary>
+在 800 名高中生的随机样本中，18% 报告目前使用电子烟。这里的参数是什么？
+
+**答案：**参数是所定义目标总体中目前使用电子烟的学生真实比例。观察到的 18% 是样本统计量。它能否良好估计该参数，取决于抽样、测量和未应答情况。
+</details>
+
+# 数据、研究设计与偏倚
+
+## 变量的角色与类型
+
+变量所扮演的角色取决于研究问题。
+
+- **结局**是关注的反应变量或健康终点。
+- **暴露**或**干预**是所比较的主要条件。
+- **协变量**是另一项已测量特征，可用于描述、提高精度、控制混杂或评估效应修饰。
+- **标识符**用于标记观察单位，通常不作为健康测量指标进行分析。
+
+| 变量类型 | 记录内容 | 公共卫生示例 | 常用汇总指标 |
+|---|---|---|---|
+| 名义分类变量 | 无顺序的类别标签 | 社区、诊所 | 频数和比例 |
+| 有序分类变量 | 有顺序但类别间距未知的标签 | 自评健康：从差到极好 | 频数、比例、中位类别 |
+| 二分类变量 | 两个类别 | 是否接种疫苗：是／否 | 频数和比例 |
+| 离散计数变量 | 非负的事件次数 | 一年内急诊就诊次数 | 均值、方差、率；通常使用计数模型 |
+| 连续变量 | 测得的数值 | 血压、年龄、BMI | 均值／标准差或中位数／四分位距 |
+| 事件发生时间变量 | 至事件发生或删失的时间 | 至复发的时间 | 生存概率、风险率、中位生存时间 |
+
+不要仅凭变量的存储格式选择汇总方法。以数字存储的邮政编码仍是分类变量，五级评分通常是有序变量，而非真正的连续变量。
+
+## 常见公共卫生研究设计
+
+| 设计 | 如何开始 | 适用目的 | 主要注意事项 |
+|---|---|---|---|
+| 横断面调查 | 在某一时点或较短时间段内抽取人群样本 | 患病率和当前分布模式 | 暴露与结局的时间先后可能不清楚 |
+| 队列研究 | 按暴露情况分组并随访结局 | 发病、风险、率及时间顺序 | 失访和混杂 |
+| 病例对照研究 | 抽取病例和对照，再评估既往暴露 | 罕见结局或潜伏期较长的结局 | 选择偏倚／回忆偏倚；无法从抽样所得表格直接估计风险 |
+| 随机试验 | 随机分配干预 | 试验条件下的干预效应 | 依从性、失访、伦理及结果的可推广性 |
+| 整群随机试验 | 将学校、诊所或社区随机分组 | 人群层面的项目 | 同一群组内的结局彼此相关 |
+| 监测系统 | 持续收集已明确定义的事件 | 趋势、信号和项目监测 | 病例定义、检测方式和完整性的变化 |
+
+<div class="callout pitfall">
+<span class="callout-title">研究设计决定结果解读</span>
+横断面研究中的关联无法确定变量出现的时间先后。病例对照研究所得优势比在其抽样设计下是有效的，但样本中的病例比例并非疾病患病率。分析聚集数据时，需要采用能够处理群组内相似性的方法。
+</div>
+
+## 偏倚、随机性与混杂
+
+三者是不同的问题：
+
+| 问题 | 通俗含义 | 示例 | 常见应对方式 |
+|---|---|---|---|
+| **随机性** | 不同随机样本所得结果会有所不同 | 一个样本中的覆盖率为 68%，另一个样本中为 71% | 用标准误和置信区间量化 |
+| **选择偏倚** | 是否被纳入研究与研究问题中的重要变量有关 | 网络调查遗漏了无法上网的居民 | 改进抽样和招募；评估未应答 |
+| **信息偏倚** | 暴露或结局的测量方式存在差异或测量不准确 | 病例对既往暴露的回忆比对照更完整 | 尽可能采用有效、标准化且设盲的测量方法 |
+| **混杂** | 一个共同原因造成或扭曲暴露与结局之间的关联 | 年龄同时影响疫苗接种和感染风险 | 依据专业知识与因果推理进行研究设计和分析 |
+
+混杂并非简单的“任意第三变量”，也不能仅凭较小的 p 值来判定。只有在协变量、模型、测量和因果假设均恰当时，调整才有助于减少混杂。
+
+<details class="knowledge-check">
+<summary>检查理解：判断研究设计及一种可能的偏倚</summary>
+研究者选取 300 名肺癌患者和 300 名未患肺癌者，并询问他们 30 年前的职业性石棉暴露情况。
+
+**答案：**这是一项病例对照研究。病例与对照对久远暴露史的回忆或重建可能存在差异，从而造成信息偏倚；对照的选择也可能造成选择偏倚。对于这种抽样所得的 2×2 表，优势比是自然的关联指标。
+</details>
+
+# 健康数据的描述与可视化
+
+## 首先检查数据
+
+下面展示模拟教学数据集的前几行。切勿在检查变量名、单位、类别、不可能值、重复记录和缺失情况之前就直接进行统计检验。
+
+```{r inspect-data}
+dim(ph_data)
+head(
+  ph_data[c(
+    "participant_id", "age", "neighborhood", "smoking_status",
+    "physical_activity_min_week", "systolic_bp"
+  )],
+  6
+)
+colSums(is.na(ph_data))
+```
+
+缺失的身体活动值编码为 `NA`，而不是零。零表示测得的活动量为零；`NA` 表示该值未知。
+
+## 集中趋势与离散程度
+
+- **均值**使用每一个观测值，因此容易受到极端观测值的影响。
+- **中位数**是排序后位于中间的数值，对极端观测值不敏感。
+- **标准差（SD）**描述观测值围绕其均值的变异程度。
+- **四分位距（IQR）**涵盖第 25 百分位数至第 75 百分位数，对极端值不敏感。
+
+如果分布大致对称，且均值与标准差能够回答研究问题，可使用均值和标准差。对于明显偏斜的分布，或当典型排序位置更有意义时，应使用中位数和四分位距。无论如何，都应先查看数据分布。
+
+```{r descriptive-summary}
+summary_table <- data.frame(
+  Variable = c("年龄（岁）", "收缩压（mmHg）",
+               "身体活动（分钟／周）"),
+  N_observed = c(sum(!is.na(ph_data$age)),
+                 sum(!is.na(ph_data$systolic_bp)),
+                 sum(!is.na(ph_data$physical_activity_min_week))),
+  Mean = c(mean(ph_data$age), mean(ph_data$systolic_bp),
+           mean(ph_data$physical_activity_min_week, na.rm = TRUE)),
+  SD = c(sd(ph_data$age), sd(ph_data$systolic_bp),
+         sd(ph_data$physical_activity_min_week, na.rm = TRUE)),
+  Median = c(median(ph_data$age), median(ph_data$systolic_bp),
+             median(ph_data$physical_activity_min_week, na.rm = TRUE)),
+  IQR = c(IQR(ph_data$age), IQR(ph_data$systolic_bp),
+          IQR(ph_data$physical_activity_min_week, na.rm = TRUE))
+)
+
+knitr::kable(
+  summary_table,
+  digits = 1,
+  col.names = c("变量", "观测数", "均值", "标准差", "中位数", "四分位距"),
+  caption = "模拟参与者数据的描述性统计"
+)
+```
+
+### 根据问题选择图形
+
+- **条形图：**比较各类别的频数或比例。
+- **直方图：**展示一个连续变量的分布形状。
+- **箱线图：**比较不同组别的连续变量分布。
+- **散点图：**展示两个连续变量之间的关系。
+- **折线图：**展示按时间排序的某项指标。
+
+```{r distribution-plots, fig.cap="在该模拟样本中，收缩压大致呈单峰分布，其分布因当前吸烟状态而有所不同。", fig.alt="图分为两个面板。左侧为收缩压直方图；右侧为非当前吸烟者和当前吸烟者的箱线图。"}
+old_par <- par(mfrow = c(1, 2), mar = c(4.2, 4.2, 2.2, 1), las = 1)
+
+hist(
+  ph_data$systolic_bp,
+  breaks = "FD",
+  col = palette_ph["sky"],
+  border = "white",
+  main = "收缩压分布",
+  xlab = "收缩压（mmHg）",
+  ylab = "参与者人数"
+)
+
+boxplot(
+  systolic_bp ~ smoking_status,
+  data = ph_data,
+  col = c(palette_ph["teal"], palette_ph["orange"]),
+  border = palette_ph["navy"],
+  names = c("非当前吸烟者", "当前吸烟者"),
+  main = "不同吸烟状态的收缩压",
+  xlab = "吸烟状态",
+  ylab = "收缩压（mmHg）"
+)
+
+par(old_par)
+```
+
+<div class="callout pitfall">
+<span class="callout-title">图形呈现的诚信原则</span>
+应标明单位，说明百分比所对应的分母，保持时间顺序，并解释数据排除情况。截断纵轴可能夸大小幅差异。三维效果和彩虹色板会增加视觉干扰，并可能降低可访问性。
+</div>
+
+## 频数、比例、风险与率
+
+- **频数**是事件数或人数。
+- **比例**的分子包含于分母之中，取值范围为 0 到 1。
+- **患病率**是在某一指定时点或规定时间段内已患某病的比例。
+- **累积发病率（风险）**是在规定时间段内，新发病例数除以期初处于风险中的人群数。
+- **发病密度**是新发病例数除以累积的风险人时。
+- **比**用于比较两个数量；分子不一定是分母的一部分。
+
+始终应说明总体、时间窗口、分子和分母。“率为 12%”这种表述含义不清，因为百分数通常描述比例，而率通常以人时为单位。
+
+```{r category-summary}
+vaccination_counts <- table(ph_data$vaccinated)
+vaccination_summary <- data.frame(
+  Vaccinated = names(vaccination_counts),
+  Count = as.vector(vaccination_counts),
+  Proportion = as.vector(vaccination_counts) / sum(vaccination_counts)
+)
+
+knitr::kable(
+  vaccination_summary,
+  digits = 3,
+  col.names = c("疫苗接种状态", "频数", "比例"),
+  caption = "模拟样本中的疫苗接种状态"
+)
+```
+
+<details class="knowledge-check">
+<summary>检查理解：选择汇总指标</summary>
+急诊科等待时间明显右偏，因为少数患者需要等待数小时。均值／标准差与中位数／四分位距相比，哪一组指标更有信息价值？
+
+**答案：**对于明显偏斜的分布，中位数和四分位距通常更能代表其集中趋势和离散程度。如果标注清楚，补充报告特定百分位数或将均值作为具有政策意义的附加指标，仍可能有用。
+</details>
+
+# 概率与抽样变异性
+
+## 健康问题中的概率
+
+概率的取值范围为 0（不可能）到 1（必然）。对于事件 $A$：
+
+<div class="formula">补集法则：\(P(A^c) = 1 - P(A)\)</div>
+
+条件概率 $P(A \mid B)$ 是在满足 $B$ 的个体中发生 $A$ 的概率。分母的界定至关重要。例如，灵敏度是**在真正患有该病的人群中**检测结果为阳性的概率。
+
+如果得知事件 $A$ 与 $B$ 中的一个发生，不会改变另一个事件发生的概率，则二者相互独立：
+
+<div class="formula">独立性：\(P(A\cap B) = P(A)P(B)\)</div>
+
+独立性是需要论证的假设，而不是默认条件。同一个人的重复观测，以及同一家庭成员的观测，往往彼此相关。
+
+## 三种常用概率分布
+
+| 分布 | 可表示的情形 | 关键条件 |
+|---|---|---|
+| 二项分布 | 在固定数量、暴露情况相近的人群中的感染人数 | 试验次数固定、每次只有两种结果、概率相同、各次试验相互独立 |
+| 正态分布 | 对称的连续测量值或抽样分布 | 在适当情境下可用钟形曲线近似 |
+| 泊松分布 | 指定时间或空间范围内的事件数 | 事件以近似稳定的速率发生；其均值与方差的关系可能过于严格 |
+
+真实数据可能不满足这些条件。例如，传染病例会出现聚集，其变异程度可能超过简单泊松模型所允许的范围。
+
+```{r probability-distributions, fig.cap="二项、正态和泊松概率模型示例。每种模型回答的问题类型各不相同。", fig.alt="三个面板分别显示二项概率质量函数、钟形正态密度曲线和泊松概率质量函数。"}
+old_par <- par(mfrow = c(1, 3), mar = c(4, 3.8, 2.4, 0.8), las = 1)
+
+x_bin <- 0:12
+plot(x_bin, dbinom(x_bin, size = 12, prob = 0.20), type = "h", lwd = 6,
+     lend = 1, col = palette_ph["blue"],
+     xlab = "12 人中的病例数", ylab = "概率", main = "二项分布")
+
+x_norm <- seq(-3.5, 3.5, length.out = 300)
+plot(x_norm, dnorm(x_norm), type = "l", lwd = 3,
+     col = palette_ph["teal"],
+     xlab = "标准化值", ylab = "密度", main = "正态分布")
+
+x_pois <- 0:14
+plot(x_pois, dpois(x_pois, lambda = 4), type = "h", lwd = 6,
+     lend = 1, col = palette_ph["vermillion"],
+     xlab = "每日事件数", ylab = "概率", main = "泊松分布")
+
+par(old_par)
+```
+
+## 抽样分布与标准误
+
+如果反复抽取随机样本并计算某个估计量，这些估计值便构成一个**抽样分布**。该分布的标准差就是估计量的**标准误（SE）**。对于来自方差有限的同一总体且相互独立的观测，样本均值的标准误估计为：
+
+<div class="formula">标准误估计：\(\widehat{SE}(\bar{x}) = s/\sqrt{n}\)</div>
+
+标准差（SD）描述的是**观测值之间**的变异；标准误（SE）描述的是**估计值的不确定性**。二者不能互换。
+
+由于我们只有一个样本，真实的抽样分布未知。**非参数自助法**通过按照原样本量，从观测数据中反复进行有放回抽样来近似该分布。此时经验样本暂时替代未知总体；这种近似无法纠正有偏或缺乏代表性的样本。
+
+```{r sampling-distribution, fig.cap="样本均值的自助抽样分布以观测均值附近为中心。虚线表示观测到的样本均值。", fig.alt="一千个自助样本均值的直方图，分布中心靠近表示观测样本均值的竖直虚线。"}
+set.seed(410)
+bootstrap_means <- replicate(
+  1000,
+  mean(sample(ph_data$systolic_bp, size = nrow(ph_data), replace = TRUE))
+)
+
+hist(bootstrap_means, breaks = 24, col = palette_ph["sky"], border = "white",
+     main = "均值的自助抽样分布",
+     xlab = "自助样本中的平均收缩压",
+     ylab = "自助样本数")
+abline(v = mean(ph_data$systolic_bp), col = palette_ph["vermillion"],
+       lwd = 3, lty = 2)
+legend("topright", legend = "观测样本均值", lty = 2, lwd = 3,
+       col = palette_ph["vermillion"], bty = "n")
+```
+
+由于标准误通常按 $1/\sqrt{n}$ 的比例减小，将样本量增加到原来的四倍，大约只能使标准误减半，而不是降为四分之一。对于聚类、配对、加权或其他存在依赖关系的观测，这个简单公式不能原样套用；标准误的计算必须反映研究设计。
+
+```{r se-scaling}
+se_example <- data.frame(
+  Sample_size = c(25, 100, 400),
+  Assumed_SD = 16,
+  Standard_error = 16 / sqrt(c(25, 100, 400))
+)
+knitr::kable(se_example, digits = 1,
+             col.names = c("样本量", "假定的标准差", "标准误"),
+             caption = "标准差为 16 时，样本量如何改变标准误")
+```
+
+<details class="knowledge-check">
+<summary>检验你的理解：SD 还是 SE？</summary>
+某报告称：“平均收缩压为 128 mmHg（SD 17）。”这里的 17 描述的是什么？
+
+**答案：** 它描述的是参与者血压值围绕样本均值的变异程度，并不直接表示总体均值估计的不确定性；后者由标准误描述。
+</details>
+
+# 估计与置信区间
+
+## 点估计与区间估计
+
+**点估计**是根据数据得到的单一最佳估计值。**区间估计**用于表达抽样不确定性。95% 置信区间（CI）由估计值、标准误以及适当的参考分布共同确定。
+
+在常见条件下，均值的置信区间为：
+
+<div class="formula">估计值 ± 临界值 × 标准误</div>
+
+```{r confidence-intervals}
+# 基于 t 分布计算平均收缩压的置信区间。
+n_bp <- sum(!is.na(ph_data$systolic_bp))
+mean_bp <- mean(ph_data$systolic_bp, na.rm = TRUE)
+se_bp <- sd(ph_data$systolic_bp, na.rm = TRUE) / sqrt(n_bp)
+ci_mean_bp <- mean_bp + c(-1, 1) * qt(0.975, df = n_bp - 1) * se_bp
+
+# 基于得分法计算疫苗接种比例的置信区间。
+x_vax <- sum(ph_data$vaccinated == "Yes")
+n_vax <- sum(!is.na(ph_data$vaccinated))
+vax_ci_object <- prop.test(x_vax, n_vax, correct = FALSE)
+vax_estimate <- unname(vax_ci_object$estimate)
+vax_ci <- vax_ci_object$conf.int
+
+ci_table <- data.frame(
+  Quantity = c("平均收缩压（mmHg）", "疫苗接种比例"),
+  Estimate = c(mean_bp, vax_estimate),
+  Lower_95_CI = c(ci_mean_bp[1], vax_ci[1]),
+  Upper_95_CI = c(ci_mean_bp[2], vax_ci[2])
+)
+
+knitr::kable(ci_table, digits = 3,
+             col.names = c("指标", "估计值", "95% 置信区间下限", "95% 置信区间上限"),
+             caption = "模拟样本的点估计与区间估计")
+```
+
+<div class="interpretation">
+估计的平均收缩压为 `r round(mean_bp, 1)` mmHg（95% CI：`r round(ci_mean_bp[1], 1)` 至 `r round(ci_mean_bp[2], 1)`）。在模型与抽样假设成立的前提下，该区间描述的是总体均值的不确定性，而不是包含 95% 个体血压值的范围。
+</div>
+
+### “95% 置信”意味着什么
+
+如果反复采用同一种有效的抽样方法和区间估计程序，所得区间中约有 95% 会包含真实参数。计算出一个具体区间后，参数是固定的；按照标准的频率学派解释，不能说这个特定区间有 95% 的概率包含真实参数。
+
+置信区间的宽度反映模型下的随机不确定性。它**不会**自动涵盖选择偏倚、测量误差、未控制的混杂、模型设定错误或数据处理错误。
+
+<div class="callout pitfall">
+<span class="callout-title">区间不是“通过/不通过”的判定工具</span>
+围绕微小效应的窄区间可能并不重要；宽区间则可能同时包含具有实际意义的获益与危害。应结合估计值、区间界限、单位、研究设计和公共卫生情境进行解释。
+</div>
+
+<details class="knowledge-check">
+<summary>检验你的理解：解释 95% 置信区间</summary>
+某风险差为 −4 个百分点，95% 置信区间为 −9 至 +1 个百分点。应如何谨慎解释？
+
+**答案：** 在相关假设成立的前提下，数据所支持的效应范围从具有实际意义的降低到小幅增加。由于区间包含 0，在双侧 5% 显著性水平下，数据不能拒绝差异为 0；但“差异无统计学显著性”并不能证明效应不存在。
+</details>
+
+# 假设检验与组间比较
+
+## 零假设与 p 值
+
+假设检验从一个**零假设** $H_0$ 开始，通常表示无差异或无关联，并设有备择假设 $H_A$。p 值是：
+
+> 在零假设和模型假设成立的前提下，获得与零假设至少像观测数据这样不相容的数据的概率。
+
+p 值**不是**零假设为真的概率，不是结果“由偶然造成”的概率，也不是效应大小。
+
+- **I 型错误**是拒绝了真实的零假设。
+- **II 型错误**是未能拒绝错误的零假设。
+- **检验效能**是在给定设计和特定真实效应下拒绝零假设的概率。
+
+检验效能取决于样本量、变异程度、效应大小、结局频率、研究设计、缺失情况以及所选显著性阈值。在条件允许时，应在收集数据之前规划检验效能。
+
+## 韦尔奇两独立样本 t 检验
+
+韦尔奇 t 检验不要求两组方差相等，因此通常是比较两个独立均值的合理默认方法。这里用它比较不同当前吸烟状态人群的平均收缩压。
+
+```{r welch-test}
+bp_test <- t.test(systolic_bp ~ smoking_status, data = ph_data)
+bp_means <- aggregate(systolic_bp ~ smoking_status, data = ph_data, mean)
+knitr::kable(bp_means, digits = 1,
+             col.names = c("当前吸烟状态", "平均收缩压（mmHg）"),
+             caption = "按当前吸烟状态分组的平均收缩压")
+```
+
+<div class="interpretation">
+将差值定义为当前吸烟者减去非当前吸烟者时，估计的均值差为 `r round(diff(bp_test$estimate), 1)` mmHg。双侧 p 值为 `r format.pval(bp_test$p.value, digits = 3)`。这一模拟的观察性比较反映的是关联，不能说明吸烟导致了该差异，因为两组的其他特征也可能不同。
+</div>
+
+### 根据研究问题与设计选择方法
+
+| 研究问题 | 常见的入门方法 | 重要检查事项 |
+|---|---|---|
+| 比较两个独立均值 | 韦尔奇两独立样本 t 检验 | 观测单位相互独立；检查分布和强影响观测值 |
+| 比较配对的前后测量值 | 对个体内差值进行配对 t 检验 | 配对关系正确；检查差值分布 |
+| 比较两个分类变量 | 卡方独立性检验 | 检查期望格数；数据稀疏时使用费舍尔精确检验 |
+| 比较有序或高度偏态的结局 | 适当时采用基于秩的方法 | 秩和检验并不自动等同于中位数检验 |
+| 估计调整后的连续型关联 | 线性回归 | 函数形式、残差模式、强影响观测值 |
+| 估计调整后的二分类关联 | 逻辑回归 | 模型设定正确、数据稀疏性、优势比的解释 |
+
+<div class="callout pitfall">
+<span class="callout-title">统计学显著不等于具有公共卫生重要性</span>
+大样本可能使很小的效应得到很小的 p 值，小型研究则可能漏掉重要效应。应报告效应估计值、置信区间、单位、可能时的绝对风险、相关假设及后果，而不能只报告 p 是否 &lt; 0.05。
+</div>
+
+多重检验同样需要重视。检验大量假设时，出现假阳性结果的可能性会增加。应预先指定主要研究问题，限制机会性检验，并在科学情境需要时采用多重性校正方法。
+
+<details class="knowledge-check">
+<summary>检验你的理解：解释 p = 0.03</summary>
+以下哪种说法正确：“零假设为真的概率是 3%”，还是“如果零假设和模型假设成立，得到至少像当前结果这样与零假设不相容的结果，其发生概率约为 3%”？
+
+**答案：** 第二种说法正确。第一种说法错误地将 p 值当作 $P(H_0 \mid data)$。p 值并不提供这个概率。
+</details>
+
+# 频率与关联指标
+
+## 队列研究形式的 2×2 表
+
+假设对 240 名工人随访一个呼吸道疾病暴发期。
+
+|  | 患病 | 未患病 | 合计 |
+|---|---:|---:|---:|
+| 暴露组 | $a=48$ | $b=72$ | 120 |
+| 未暴露组 | $c=24$ | $d=96$ | 120 |
+
+两组的风险分别为：
+
+<div class="formula">暴露组风险 = \(a/(a+b)\)；未暴露组风险 = \(c/(c+d)\)</div>
+
+以下三种常见关联指标回答不同的问题：
+
+<div class="formula">风险差：\(RD = a/(a+b) - c/(c+d)\)</div>
+
+<div class="formula">风险比：\(RR = [a/(a+b)]/[c/(c+d)]\)</div>
+
+<div class="formula">优势比：\(OR = ad/(bc)\)</div>
+
+```{r two-by-two}
+a <- 48; b <- 72; c <- 24; d <- 96
+risk_exposed <- a / (a + b)
+risk_unexposed <- c / (c + d)
+risk_difference <- risk_exposed - risk_unexposed
+risk_ratio <- risk_exposed / risk_unexposed
+odds_ratio <- (a * d) / (b * c)
+
+# 用于教学演示的大样本置信区间。
+se_rd <- sqrt(risk_exposed * (1 - risk_exposed) / (a + b) +
+                risk_unexposed * (1 - risk_unexposed) / (c + d))
+ci_rd <- risk_difference + c(-1, 1) * 1.96 * se_rd
+
+se_log_rr <- sqrt(1 / a - 1 / (a + b) + 1 / c - 1 / (c + d))
+ci_rr <- exp(log(risk_ratio) + c(-1, 1) * 1.96 * se_log_rr)
+
+se_log_or <- sqrt(1 / a + 1 / b + 1 / c + 1 / d)
+ci_or <- exp(log(odds_ratio) + c(-1, 1) * 1.96 * se_log_or)
+
+effect_table <- data.frame(
+  Measure = c("风险差", "风险比", "优势比"),
+  Estimate = c(risk_difference, risk_ratio, odds_ratio),
+  Lower_95_CI = c(ci_rd[1], ci_rr[1], ci_or[1]),
+  Upper_95_CI = c(ci_rd[2], ci_rr[2], ci_or[2])
+)
+
+knitr::kable(effect_table, digits = 2,
+             col.names = c("指标", "估计值", "95% 置信区间下限", "95% 置信区间上限"),
+             caption = "暴发示例中未经调整的关联指标")
+```
+
+<div class="interpretation">
+暴露组工人的患病风险为 40%，未暴露组为 20%。估计风险差为 20 个百分点，即在本次暴发期内，每 100 名工人中增加 20 例病例。风险比为 2.0，表示暴露组观察到的风险是未暴露组的两倍。优势比为 2.67，不应将其误称为风险比。
+</div>
+
+### 选择关联指标
+
+- **风险差**表示风险的绝对增加或降低，通常可直接用于项目规划。
+- **风险比**表示规定时期内的相对风险。
+- **优势比**比较两组的优势。它自然产生于逻辑回归和病例-对照抽样。
+- 当结局少见时，优势比可能近似风险比；当结局常见时，二者的数值可能相差很大。
+
+这些计算均未经调整。存在混杂、聚类、删失、随访时间不等或复杂抽样时，可能需要采用其他方法。
+
+<details class="knowledge-check">
+<summary>检验你的理解：绝对效应与相对效应</summary>
+某干预将风险从 2% 降至 1%。风险差和风险比分别是多少？
+
+**答案：** 风险差为 −1 个百分点（1% − 2%）；风险比为 0.50（1% / 2%），即相对降低 50%。两者都正确，但传达的信息不同。
+</details>
+
+# 筛查与诊断试验
+
+## 评价试验性能需要参考标准
+
+设想一个包含 1,000 人的筛查项目。参考标准判定其中 80 人患有该病。筛查试验得到以下结果：
+
+|  | 患病 | 未患病 | 合计 |
+|---|---:|---:|---:|
+| 检测阳性 | TP = 68 | FP = 92 | 160 |
+| 检测阴性 | FN = 12 | TN = 828 | 840 |
+| 合计 | 80 | 920 | 1,000 |
+
+<div class="formula">灵敏度 = \(TP/(TP+FN)\)；特异度 = \(TN/(TN+FP)\)</div>
+
+<div class="formula">PPV = \(TP/(TP+FP)\)；NPV = \(TN/(TN+FN)\)</div>
+
+```{r screening-measures}
+tp <- 68; fp <- 92; fn <- 12; tn <- 828
+screening <- data.frame(
+  Measure = c("灵敏度", "特异度", "阳性预测值",
+              "阴性预测值"),
+  Estimate = c(tp / (tp + fn), tn / (tn + fp),
+               tp / (tp + fp), tn / (tn + fn))
+)
+knitr::kable(screening, digits = 3,
+             col.names = c("指标", "估计值"),
+             caption = "假设项目中的筛查性能")
+```
+
+<div class="interpretation">
+灵敏度为 85%，特异度为 90%。然而，在检测阳性者中，真正患病的比例只有 42.5%（PPV）。出现这一差异，是因为该筛查人群的患病率为 8%，而人数多得多的未患病组会累积较多假阳性结果。
+</div>
+
+## 预测值随患病率变化
+
+当灵敏度和特异度固定时，PPV 通常随患病率升高而升高，NPV 通常随之降低。
+
+```{r predictive-value-plot, fig.cap="即使灵敏度固定为 85%、特异度固定为 90%，预测值仍会随患病率变化。", fig.alt="折线图显示，随着患病率升高，阳性预测值上升，阴性预测值下降。"}
+prevalence_grid <- seq(0.01, 0.50, by = 0.01)
+sens <- 0.85
+spec <- 0.90
+ppv_grid <- sens * prevalence_grid /
+  (sens * prevalence_grid + (1 - spec) * (1 - prevalence_grid))
+npv_grid <- spec * (1 - prevalence_grid) /
+  ((1 - sens) * prevalence_grid + spec * (1 - prevalence_grid))
+
+plot(prevalence_grid, ppv_grid, type = "l", lwd = 3,
+     col = palette_ph["vermillion"], ylim = c(0, 1),
+     xlab = "患病率", ylab = "预测值",
+     main = "预测值取决于患病率")
+lines(prevalence_grid, npv_grid, lwd = 3, lty = 2,
+      col = palette_ph["blue"])
+legend("right", legend = c("PPV", "NPV"), lwd = 3, lty = c(1, 2),
+       col = c(palette_ph["vermillion"], palette_ph["blue"]), bty = "n")
+```
+
+提高灵敏度的阈值选择通常会降低特异度，反之亦然。应如何权衡，取决于漏诊、误报的后果，以及随访资源和公平性。由于疾病谱和验证过程不同，灵敏度和特异度也可能因人群而异。
+
+<details class="knowledge-check">
+<summary>检验你的理解：应该使用哪个分母？</summary>
+计算灵敏度时，分母应为所有检测阳性者，还是所有真正患病者？
+
+**答案：** 分母应为所有真正患病者，即 (TP+FN)。在检测阳性者中，真阳性所占比例是 PPV，其分母为 (TP+FP)。
+</details>
+
+# 相关与回归基础
+
+## 相关性是一种描述，而非因果结论
+
+皮尔逊相关系数概括两个数值变量之间线性关系的强度。斯皮尔曼相关系数概括单调的秩相关关系。离群值、受限的取值范围、混合的亚组以及非线性模式都可能影响这两种相关系数。
+
+```{r scatterplot, fig.cap="在模拟数据中，收缩压往往随年龄增加而升高，但个体之间存在较大差异。", fig.alt="收缩压与年龄的散点图，并叠加一条向上倾斜的拟合直线。"}
+plot(ph_data$age, ph_data$systolic_bp,
+     pch = 16, cex = 0.65, col = rgb(0, 114/255, 178/255, 0.38),
+     xlab = "年龄（岁）", ylab = "收缩压（mmHg）",
+     main = "年龄与收缩压")
+abline(lm(systolic_bp ~ age, data = ph_data),
+       col = palette_ph["vermillion"], lwd = 3)
+```
+
+皮尔逊相关系数为 `r round(cor(ph_data$age, ph_data$systolic_bp), 2)`。该数值并不能证明年龄的变化会使血压发生某个特定幅度的变化。要作因果解释，除了相关性之外，还需要合理、可辩护的研究设计与假设。
+
+## 连续结局的线性回归
+
+多元线性模型可以将平均收缩压描述为若干协变量的函数：
+
+<div class="formula">\(E(Y\mid X) = \beta_0 + \beta_1X_1 + \beta_2X_2 + \cdots\)</div>
+
+```{r linear-regression}
+bp_model <- lm(systolic_bp ~ age + bmi + smoking_status, data = ph_data)
+coef_table <- summary(bp_model)$coefficients
+coef_table_display <- coef_table
+rownames(coef_table_display) <- c(
+  "截距", "年龄（每增加 1 岁）", "体重指数（每增加 1 单位）",
+  "当前吸烟（参照：当前不吸烟）"
+)
+knitr::kable(
+  coef_table_display,
+  digits = 3,
+  col.names = c("估计值", "标准误", "t 值", "p 值"),
+  caption = "收缩压的线性回归"
+)
+```
+
+<div class="interpretation">
+年龄的回归系数为每增加 1 岁 `r round(coef(bp_model)["age"], 2)` mmHg。在该模型中，体重指数和吸烟状态相同而年龄相差 1 岁的参与者，其平均收缩压相差约 `r abs(round(coef(bp_model)["age"], 2))` mmHg。这个系数表示调整后的关联，并不自然等同于因果效应。
+</div>
+
+应检查残差模式、线性关系、有影响力的观测、观测间依赖性，以及用线性模型描述条件均值在科学上是否合理。样本量很大也无法弥补错误的函数形式。
+
+## 二元结局的逻辑回归
+
+逻辑回归对二元结局优势的对数进行建模。将回归系数取指数得到的是**优势比**，而不是风险比。
+
+```{r logistic-regression}
+infection_model <- glm(
+  respiratory_infection ~ vaccinated + age + smoking_status + neighborhood,
+  data = ph_data,
+  family = binomial()
+)
+
+model_coef <- summary(infection_model)$coefficients
+non_intercept <- rownames(model_coef) != "(Intercept)"
+or_table <- data.frame(
+  Term = rownames(model_coef)[non_intercept],
+  Odds_ratio = exp(model_coef[non_intercept, "Estimate"]),
+  Lower_95_CI = exp(model_coef[non_intercept, "Estimate"] -
+                      1.96 * model_coef[non_intercept, "Std. Error"]),
+  Upper_95_CI = exp(model_coef[non_intercept, "Estimate"] +
+                      1.96 * model_coef[non_intercept, "Std. Error"]),
+  P_value = model_coef[non_intercept, "Pr(>|z|)"],
+  row.names = NULL
+)
+
+term_labels_zh <- c(
+  vaccinatedYes = "已接种（参照：未接种）",
+  age = "年龄（每增加 1 岁）",
+  smoking_statusCurrent = "当前吸烟（参照：当前不吸烟）",
+  neighborhoodNorth = "北区（参照：中心区）",
+  neighborhoodSouth = "南区（参照：中心区）",
+  neighborhoodWest = "西区（参照：中心区）"
+)
+or_table_display <- or_table
+or_table_display$Term <- unname(term_labels_zh[or_table_display$Term])
+
+knitr::kable(
+  or_table_display,
+  digits = 3,
+  col.names = c("变量或对比", "优势比", "95% 置信区间下限", "95% 置信区间上限", "p 值"),
+  caption = "呼吸道感染的调整后优势比（未列出截距）"
+)
+```
+
+<div class="interpretation">
+接种者与未接种者相比的调整后优势比为 `r round(or_table$Odds_ratio[or_table$Term == "vaccinatedYes"], 2)`（95% 置信区间：`r round(or_table$Lower_95_CI[or_table$Term == "vaccinatedYes"], 2)` 至 `r round(or_table$Upper_95_CI[or_table$Term == "vaccinatedYes"], 2)`）。它描述的是该模拟模型中的条件关联，而不是调整后的风险比；仅凭这一结果也不能确立疫苗有效性。
+</div>
+
+分类变量项比较所显示的因子水平与其参照水平；年龄的优势比对应年龄相差 1 岁。截距取指数后表示基线优势，并不是优势比，因此表中有意省略了截距。
+
+<div class="callout pitfall">
+<span class="callout-title">调整并非万能</span>
+不要仅因为协变量在单变量分析中的 p 值较小就选择它们。应依据专业领域知识和因果框架预先指定变量。估计总效应时，应避免调整暴露的后果；同时要记住，未测量或测量不佳的混杂仍可能存在。
+</div>
+
+### 效应修饰
+
+同一关联可能确实因亚组或情境而异，这称为**效应修饰**或交互作用，并不一定是偏倚。应在具有科学意义的尺度上评估效应修饰，预先指定关键的亚组问题，并报告各亚组估计值及其不确定性，而不是比较哪个亚组的 p 值跨过了 0.05 的界线。
+
+<details class="knowledge-check">
+<summary>检验你的理解：解释优势比</summary>
+逻辑回归模型给出干预组相对于对照组的调整后优势比为 0.70。能否据此说风险降低了 30%？
+
+**答案：** 不能，除非有其他信息或采用了直接估计风险的方法。因为 $1-0.70=0.30$，可以说优势降低了 30%。当结局罕见时，风险比可能与优势比接近；但当结局常见时，优势与风险可能相差很大。
+</details>
+
+# 可复现性、公平与伦理
+
+## 可复现的分析轨迹
+
+一项经得起推敲的分析，应使其他分析人员能够理解具体做法并复现结果。
+
+1. 以只读形式保留原始数据，并记录数据来源和版本。
+2. 使用数据字典记录定义、单位、允许值和缺失值编码。
+3. 用脚本完成数据清理与分析，不要依赖未记录的点击操作。
+4. 记录每个阶段的排除情况和分母。
+5. 对模拟或含随机性的算法设置随机种子。
+6. 在相关时报告软件和程序包版本。
+7. 将探索性分析与验证性分析分开。
+8. 保护标识符、小频数单元格、地理位置和敏感属性。
+
+```{r reproducibility-check}
+# 建模前应进行的简要检查。
+data_quality <- data.frame(
+  Check = c("数据行数", "重复的参与者编号", "缺失的身体活动值",
+            "年龄超出 18–85 岁", "收缩压超出 70–250 mmHg"),
+  Result = c(
+    nrow(ph_data),
+    sum(duplicated(ph_data$participant_id)),
+    sum(is.na(ph_data$physical_activity_min_week)),
+    sum(ph_data$age < 18 | ph_data$age > 85),
+    sum(ph_data$systolic_bp < 70 | ph_data$systolic_bp > 250)
+  )
+)
+knitr::kable(
+  data_quality,
+  col.names = c("检查项目", "结果"),
+  caption = "部分可复现的数据质量检查"
+)
+```
+
+## 缺失数据也是研究问题的一部分
+
+应追问数值为何缺失、不同组的缺失模式是否不同，以及分析采用了哪些假设。完整个案分析可能降低精确度并引入偏倚。绝不能在不作说明的情况下把缺失值转换为零，也不要自动删除数据行而不报告其影响。
+
+更进阶的处理方法包括多重插补、逆概率加权、基于似然的方法和敏感性分析。这些方法是否有效取决于相应假设，而这些假设应被明确陈述和检验。
+
+## 公平与负责任的解释
+
+<div class="callout ethics">
+<span class="callout-title">健康数据代表着真实的人与制度系统</span>
+应保护隐私，避免污名化语言，说明类别的定义方式，并让相关社区参与数据收集和结果报告的决策。即使模型在技术上正确，如果研究问题、标签或结果用途不恰当，仍可能造成伤害。
+</div>
+
+种族和族裔变量通常反映社会、政治、历史和测量过程，不应被当作简单的生物学原因。当观察到健康差异时，应调查结构性条件、服务可及性、歧视、环境和测量实践。应避免公布可能导致个人身份被识别的小频数单元格，尤其是在地理信息与罕见疾病相结合时。
+
+调查权重、分层、聚类、重复测量、多层结构、事件发生时间结局、空间相关以及因果估计目标，通常需要采用本入门指南范围之外的方法。正确的下一步是识别这些数据结构并寻找合适的方法，而不是忽略它们。
+
+<details class="knowledge-check">
+<summary>检验你的理解：审视一种报告方式</summary>
+一幅地图标出了六名罕见感染患者的精确居住位置。首要担忧是什么？
+
+**答案：** 再识别和隐私风险。发布前应汇总或掩蔽地理信息、应用信息披露控制规则，并让数据管理人员和受影响社区参与决策。公共利益并不能免除保护参与者的义务。
+</details>
+
+# 引导式小型案例研究
+
+## 研究问题与设计
+
+**研究问题：** 在模拟的社区样本中，接种疫苗是否与较低的 12 周呼吸道感染观察风险相关？
+
+出于教学目的，我们把该样本视为在同一时间段内接受观察的队列。先进行未调整分析，再结合上文的调整后逻辑回归模型进行解释。由于这些数据是模拟的观察性数据，所得结果并不是对现实世界疫苗效果的估计。
+
+## 第 1 步：核对分母并创建 2×2 表
+
+```{r mini-case-table}
+vax_table <- with(
+  ph_data,
+  table(Vaccinated = vaccinated, Infection = respiratory_infection)
+)
+vax_table_display <- vax_table
+dimnames(vax_table_display) <- list(
+  接种状态 = c("未接种", "已接种"),
+  感染状态 = c("未感染", "感染")
+)
+vax_table_display
+
+risk_vaccinated <- vax_table["Yes", "Yes"] / sum(vax_table["Yes", ])
+risk_unvaccinated <- vax_table["No", "Yes"] / sum(vax_table["No", ])
+rd_vax <- risk_vaccinated - risk_unvaccinated
+rr_vax <- risk_vaccinated / risk_unvaccinated
+
+a_v <- unname(vax_table["Yes", "Yes"])
+b_v <- unname(vax_table["Yes", "No"])
+c_v <- unname(vax_table["No", "Yes"])
+d_v <- unname(vax_table["No", "No"])
+se_log_rr_vax <- sqrt(1 / a_v - 1 / (a_v + b_v) +
+                        1 / c_v - 1 / (c_v + d_v))
+ci_rr_vax <- exp(log(rr_vax) + c(-1, 1) * 1.96 * se_log_rr_vax)
+
+se_rd_vax <- sqrt(
+  risk_vaccinated * (1 - risk_vaccinated) / (a_v + b_v) +
+    risk_unvaccinated * (1 - risk_unvaccinated) / (c_v + d_v)
+)
+ci_rd_vax <- rd_vax + c(-1, 1) * 1.96 * se_rd_vax
+
+ci_risk_vaccinated <- prop.test(a_v, a_v + b_v, correct = FALSE)$conf.int
+ci_risk_unvaccinated <- prop.test(c_v, c_v + d_v, correct = FALSE)$conf.int
+
+mini_results <- data.frame(
+  Measure = c("接种者的风险", "未接种者的风险",
+              "风险差", "风险比"),
+  Estimate = c(risk_vaccinated, risk_unvaccinated, rd_vax, rr_vax),
+  Lower_95_CI = c(ci_risk_vaccinated[1], ci_risk_unvaccinated[1],
+                  ci_rd_vax[1], ci_rr_vax[1]),
+  Upper_95_CI = c(ci_risk_vaccinated[2], ci_risk_unvaccinated[2],
+                  ci_rd_vax[2], ci_rr_vax[2])
+)
+knitr::kable(
+  mini_results,
+  digits = 3,
+  col.names = c("指标", "估计值", "95% 置信区间下限", "95% 置信区间上限"),
+  caption = "模拟小型案例研究中的未调整估计值及其 95% 置信区间"
+)
+```
+
+两个风险估计采用得分置信区间。风险差区间采用简单的大样本正态近似，风险比区间采用大样本对数近似；这些教学用方法可能不适合稀疏数据。
+
+## 第 2 步：可视化绝对风险
+
+```{r mini-case-plot, fig.cap="在模拟数据集中，接种者的感染观察风险低于未接种者。", fig.alt="双柱状图，比较未接种者与接种者的呼吸道感染风险；每根柱上方标有百分比。"}
+risks <- c("未接种" = risk_unvaccinated, "已接种" = risk_vaccinated)
+bar_positions <- barplot(
+  risks,
+  ylim = c(0, max(risks) * 1.30),
+  col = c(palette_ph["orange"], palette_ph["teal"]),
+  border = NA,
+  ylab = "12 周感染观察风险",
+  main = "不同疫苗接种状态的呼吸道感染风险",
+  las = 1
+)
+text(bar_positions, risks, labels = pct(risks), pos = 3, font = 2)
+```
+
+## 第 3 步：结合情境报告估计结果
+
+<div class="interpretation">
+在 `r sum(ph_data$vaccinated == "Yes")` 名接种者中，感染观察风险为 `r pct(risk_vaccinated)`；在 `r sum(ph_data$vaccinated == "No")` 名未接种者中，该风险为 `r pct(risk_unvaccinated)`。未调整风险比为 `r round(rr_vax, 2)`（95% 置信区间：`r round(ci_rr_vax[1], 2)` 至 `r round(ci_rr_vax[2], 2)`），风险差为 `r round(100 * rd_vax, 1)` 个百分点（95% 置信区间：`r round(100 * ci_rd_vax[1], 1)` 至 `r round(100 * ci_rd_vax[2], 1)`）。在这个模拟样本中，疫苗接种与较低的感染风险相关。由于疫苗接种并非随机分配，医疗服务可及性、年龄、居住区域、健康行为或其他因素的组间差异可能影响这一关联，因此不能把该结果解释为因果关系的证明。
+</div>
+
+### 四句话报告模板
+
+> 在**[研究人群]**中，第 1 组的**[结局]**估计值为**[估计值]**，第 0 组为**[估计值]**。估计的**[风险差/风险比/均值差]**为**[数值]**，95% 置信区间为**[下限，上限]**。这提示**[包含单位和时间范围的通俗解释]**。由于数据来自**[研究设计]**，**[具体局限]**可能影响该估计，因此不应假定存在因果关系。
+
+<details class="knowledge-check">
+<summary>小型案例反思</summary>
+为什么未调整风险比可能与调整后优势比不同？
+
+**答案：** 二者是不同的指标（风险比与优势比），而且调整后模型以年龄、吸烟状态和居住区域为条件。因此，二者的差异既可能反映指标尺度不同，也可能来自协变量调整。模型设定、稀疏亚组和抽样变异也可能造成差异。
+</details>
+
+# 快速参考
+
+## 核心公式
+
+| 指标 | 公式 | 解释 |
+|---|---|---|
+| 患病率 | 现有病例数 / 界定的人群数 | 在指定时点或期间患有该病的比例 |
+| 累积发病率 | 新发病例数 / 期初处于风险中的人群数 | 规定期间内发生结局的风险 |
+| 发病密度 | 新发病例数 / 风险人时 | 新发事件发生的速率 |
+| 风险差 | $p_1-p_0$ | 风险的绝对增加或降低 |
+| 风险比 | $p_1/p_0$ | 相对风险 |
+| 优势比 | 2×2 表中的 $ad/bc$ | 两组优势之比 |
+| 均值的标准误估计 | $s/\sqrt{n}$ | 均值抽样变异性的估计 |
+| 比例的近似标准误 | \(\sqrt{\hat p(1-\hat p)/n}\) | 简单的大样本不确定性近似 |
+| 灵敏度 | $TP/(TP+FN)$ | 患病者中检测阳性的比例 |
+| 特异度 | $TN/(TN+FP)$ | 未患病者中检测阴性的比例 |
+| 阳性预测值（PPV） | $TP/(TP+FP)$ | 检测阳性者中实际患病的比例 |
+| 阴性预测值（NPV） | $TN/(TN+FN)$ | 检测阴性者中实际未患病的比例 |
+
+对于小样本或接近 0 或 1 的比例，基本的瓦尔德区间表现可能较差。根据分析目标，得分区间、威尔逊区间或精确法通常更为合适。
+
+## 方法选择检查清单
+
+选择方法前，应先回答：
+
+- 目标总体和目标估计量是什么？
+- 结局属于哪种类型？
+- 观测是独立、配对、聚类、重复、删失，还是经过调查加权的？
+- 如何测量参与者特征和研究变量？
+- 重要数值是否存在缺失？
+- 需要哪些分布假设或模型假设？
+- 哪种效应尺度容易理解并与决策相关？
+- 即使计算无误，仍存在哪些偏倚来源？
+
+## 通俗术语表
+
+| 术语 | 含义 |
+|---|---|
+| 偏倚 | 使估计值系统性偏离目标量的倾向 |
+| 置信区间 | 由旨在量化抽样不确定性的统计程序所产生的区间 |
+| 混杂因素 | 因果结构中能够产生或扭曲关联的变量 |
+| 估计值 | 根据样本得到的目标参数近似值 |
+| 目标估计量 | 分析拟估计的、经过精确定义的量 |
+| 可推广性 | 研究结果适用于目标总体或目标情境的程度 |
+| 精确度 | 估计值随机变异较小的程度，常由置信区间宽度反映 |
+| p 值 | 在模型假设下，数据与零假设相容程度的一种度量 |
+| 标准差 | 观测值之间的变异 |
+| 标准误 | 统计量抽样变异性的估计 |
+
+# 最终知识检验
+
+1. 哪个指标的分母使用人时？
+2. 为什么样本均值是统计量而不是参数？
+3. 标准差（SD）与标准误（SE）有何区别？
+4. 95% 置信区间是否包含 95% 的个体观测值？
+5. $p=0.20$ 能否证明两个总体完全相同？
+6. 优势比在什么情况下可能与风险比相差很大？
+7. 为什么疾病患病率下降时，阳性预测值通常也会下降？
+8. 多变量调整能否保证所得结果是因果效应？
+
+<details class="knowledge-check">
+<summary>显示最终答案</summary>
+
+1. 发病密度使用风险人时作为分母。
+2. 因为它由样本计算得到；总体均值才是参数。
+3. 标准差描述观测值之间的变异，标准误描述估计值的不确定性。
+4. 不是。置信区间反映参数估计的不确定性，而不是个体观测值的分布。
+5. 不能。未拒绝零假设并不能证明两组完全相同；还应考虑估计值、置信区间、检验效能以及有实际意义的等效界值。
+6. 当结局常见时。此时优势比可能比相应风险比离 1 更远。
+7. 真正病例减少时，即使灵敏度和特异度保持不变，假阳性也可能在全部阳性结果中占据更大比例。
+8. 不能。因果解释还需要适当的研究设计、正确的时间顺序、充分的测量、合理的模型设定，以及可辩护的无未测量混杂假设和其他假设。
+
+</details>
+
+## 下一步学习方向 {-}
+
+公共卫生后续训练可包括样本量规划、调查权重与设计效应、广义线性模型、纵向数据与多层数据、生存分析、空间方法、因果推断、贝叶斯方法、缺失数据方法以及透明报告指南。
+
+<div class="footer-note">
+<strong>教学用途：</strong>本模块用于介绍统计推理，不能替代在高风险研究或政策决策中向生物统计学家寻求专业咨询。所有数据和数值结果均为模拟结果。可使用页面顶部的按钮下载源 `.Rmd` 文件。
+</div>

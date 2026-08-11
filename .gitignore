@@ -9,8 +9,8 @@
 .Rlib/
 .tools/
 
-# Local-only R Markdown sources
-*.Rmd
+# Local-only R Markdown sources (all folders and letter cases)
+*.[Rr][Mm][Dd]
 
 # R Markdown intermediate output
 *_cache/

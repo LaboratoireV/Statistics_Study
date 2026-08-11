@@ -34,11 +34,24 @@ if (length(available_pandoc)) {
   Sys.setenv(RSTUDIO_PANDOC = available_pandoc[[1]])
 }
 
-render_targets <- list(
-  c("biostatistics_foundations.Rmd", "biostatistics_foundations.html"),
-  c("biostatistics_foundations_zh.Rmd", "biostatistics_foundations_zh.html"),
-  c("biostatistics_bilingual.Rmd", "biostatistics_bilingual.html")
+render_inputs <- sort(list.files(
+  path = project_dir,
+  pattern = "[.][Rr][Mm][Dd]$",
+  full.names = FALSE
+))
+
+if (!length(render_inputs)) {
+  stop("No R Markdown files found in the project directory.", call. = FALSE)
+}
+
+render_targets <- lapply(
+  render_inputs,
+  function(input) {
+    c(input, sub("[.][Rr][Mm][Dd]$", ".html", input))
+  }
 )
+
+message("Found ", length(render_targets), " R Markdown files to render.")
 
 for (target in render_targets) {
   message("\nRendering ", target[[1]], " ...")

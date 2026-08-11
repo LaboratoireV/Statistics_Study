@@ -10,6 +10,7 @@
 - `biostatistics_foundations_zh.html`：完整中文版单文件 HTML。
 - `biostatistics_foundations.Rmd`：英文 R Markdown 源文件。
 - `biostatistics_foundations_zh.Rmd`：中文 R Markdown 源文件。
+- `includes/vlab-brand.html`：三个页面共用的 The V Lab 品牌组件。
 - `styles.css`：页面样式与手机、打印适配。
 - `render.R`：可重复渲染脚本。
 

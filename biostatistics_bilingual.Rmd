@@ -1,5 +1,6 @@
 ---
 title: "Biostatistics Foundations / 公共卫生生物统计学基础"
+pagetitle: "Biostatistics Foundations / 公共卫生生物统计学基础 | The V Lab"
 subtitle: "A bilingual learning module for public health students / 面向公共卫生学生的双语学习模块"
 author: "School of Public Health Learning Module / 公共卫生学院学习模块"
 date: "Updated / 更新于 `r format(Sys.Date(), '%Y-%m-%d')`"
@@ -12,6 +13,8 @@ output:
     toc: false
     math_method: mathml
     css: styles.css
+    includes:
+      before_body: includes/vlab-brand.html
 ---
 
 <div class="callout note">

@@ -12,7 +12,8 @@
 <meta name="author" content="School of Public Health Learning Module / 公共卫生学院学习模块" />
 
 
-<title>Biostatistics Foundations / 公共卫生生物统计学基础</title>
+<title>Biostatistics Foundations / 公共卫生生物统计学基础 | The V
+Lab</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -301,6 +302,37 @@ content: "代码 ▾";
 .main-container {
 max-width: 1160px;
 padding: 0 clamp(1rem, 3vw, 2.25rem) 4rem;
+}
+.vlab-brand {
+display: flex;
+align-items: center;
+gap: 0.65rem;
+width: fit-content;
+margin: 1.5rem 0 0.65rem;
+color: var(--navy);
+font-weight: 800;
+letter-spacing: 0.085em;
+line-height: 1;
+text-transform: uppercase;
+}
+.vlab-mark {
+display: inline-flex;
+align-items: center;
+justify-content: center;
+width: 2rem;
+height: 2rem;
+color: #fff;
+background: linear-gradient(135deg, var(--navy), var(--teal));
+border-radius: 9px;
+box-shadow: 0 5px 14px rgba(23, 50, 77, 0.18);
+font-size: 1rem;
+letter-spacing: 0;
+}
+.vlab-name {
+font-size: 0.9rem;
+}
+.vlab-brand + #header {
+margin-top: 0.65rem;
 }
 #header {
 margin: 1.5rem 0 2.25rem;
@@ -693,6 +725,14 @@ box-shadow: none;
 #header .date {
 color: var(--navy);
 }
+.vlab-brand {
+color: #111;
+}
+.vlab-mark {
+color: #fff;
+background: var(--navy);
+box-shadow: none;
+}
 .tocify-wrapper,
 .btn,
 .code-folding-btn,
@@ -803,6 +843,10 @@ display: none;
 
 
 
+<div class="vlab-brand" aria-label="The V Lab">
+  <span class="vlab-mark" aria-hidden="true">V</span>
+  <span class="vlab-name">The V Lab</span>
+</div>
 
 <div id="header">
 

@@ -10,11 +10,8 @@
 
 - `index.html`：The V Lab 网站首页。
 - `biostatistics_bilingual.html`：中英双语入口页。
-- `biostatistics_bilingual.Rmd`：中英双语入口页的 R Markdown 源文件。
 - `biostatistics_foundations.html`：完整英文版单文件 HTML。
 - `biostatistics_foundations_zh.html`：完整中文版单文件 HTML。
-- `biostatistics_foundations.Rmd`：英文 R Markdown 源文件。
-- `biostatistics_foundations_zh.Rmd`：中文 R Markdown 源文件。
 - `includes/vlab-brand.html`：三个页面共用的 The V Lab 品牌组件。
 - `og.png`：网站链接分享预览图。
 - `.nojekyll`：让 GitHub Pages 原样发布静态文件。
@@ -23,7 +20,9 @@
 
 ## 重新渲染
 
-在这个目录中运行：
+三份 `.Rmd` 源文件仅保存在本地工作副本中，并通过 `.gitignore` 排除，不发布到 GitHub。生成的 HTML 会显示教学代码，但不再嵌入可下载的完整 Rmd 源文件。
+
+在包含本地 Rmd 源文件的工作副本中运行：
 
 ```bash
 Rscript render.R

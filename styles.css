@@ -78,7 +78,13 @@ html[lang^="zh"] button.dropdown-toggle::after {
   font-weight: 800;
   letter-spacing: 0.085em;
   line-height: 1;
+  text-decoration: none;
   text-transform: uppercase;
+}
+
+.vlab-brand:hover {
+  color: var(--teal-dark);
+  text-decoration: none;
 }
 
 .vlab-mark {

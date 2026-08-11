@@ -15,6 +15,8 @@
 - `linear_regression_en.html` / `linear_regression.html`：线性回归。
 - `logistic_regression_en.html` / `logistic_regression.html`：逻辑回归。
 - `causal_inference_en.html` / `causal_inference.html`：因果推断。
+- `propensity_score_matching_en.html` / `propensity_score_matching.html`：倾向评分匹配的设计、诊断与效应估计。
+- `survival_analysis_en.html` / `survival_analysis.html`：生存分析基础、复杂事件过程与完整应用流程。
 - `aft_cox_models_en.html` / `aft_cox_models.html`：AFT 与 Cox PH 生存模型。
 - `includes/vlab-brand.html`：学习页面共用的 The V Lab 品牌组件。
 - `og-learning-hub.png`：学习网站的社交分享预览图。
@@ -37,7 +39,7 @@ Rscript render.R
 
 ```bash
 mkdir -p .Rlib
-Rscript -e 'install.packages(c("rmarkdown", "knitr", "survival"), lib = ".Rlib", repos = "https://cloud.r-project.org")'
+Rscript -e 'install.packages(c("rmarkdown", "knitr", "survival", "MatchIt"), lib = ".Rlib", repos = "https://cloud.r-project.org")'
 ```
 
 文档中的全部数据均为固定随机种子生成的模拟数据，不包含真实个人健康信息。

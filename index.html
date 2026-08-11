@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="The V Lab">
   <meta property="og:title" content="Biostatistics Learning Hub | The V Lab">
-  <meta property="og:description" content="Learn biostatistics through a bilingual curriculum spanning foundations, statistical tests, regression, causal inference, and survival analysis.">
+  <meta property="og:description" content="Learn biostatistics through a bilingual curriculum spanning foundations, regression, causal inference, propensity score matching, and survival analysis.">
   <meta property="og:url" content="https://laboratoirev.github.io/Statistics_Study/">
   <meta property="og:image" content="https://laboratoirev.github.io/Statistics_Study/og-learning-hub.png">
   <meta property="og:image:width" content="1200">
@@ -18,7 +18,7 @@
   <meta property="og:image:alt" content="The V Lab Biostatistics Learning Hub">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Biostatistics Learning Hub | The V Lab">
-  <meta name="twitter:description" content="A bilingual learning path from statistical foundations to causal and survival models.">
+  <meta name="twitter:description" content="A bilingual learning path from statistical foundations to causal inference, matching, and survival models.">
   <meta name="twitter:image" content="https://laboratoirev.github.io/Statistics_Study/og-learning-hub.png">
   <title>Biostatistics Learning Hub | The V Lab</title>
   <style>
@@ -1011,9 +1011,9 @@
 
       <aside class="hero-panel" aria-label="Curriculum at a glance">
         <p class="panel-kicker">Curriculum at a glance</p>
-        <p class="course-count"><strong>13</strong> guided pages</p>
+        <p class="course-count"><strong>17</strong> guided pages</p>
         <div class="stat-grid">
-          <div class="stat"><strong>6 subjects</strong><span>from foundations to advanced methods</span></div>
+          <div class="stat"><strong>8 subjects</strong><span>from foundations to advanced methods</span></div>
           <div class="stat"><strong>2 languages</strong><span>English and <span lang="zh-CN">中文</span></span></div>
           <div class="stat"><strong>Visible R code</strong><span>reproducible examples throughout</span></div>
           <div class="stat"><strong>Self-paced</strong><span>learn in sequence or by topic</span></div>
@@ -1021,8 +1021,8 @@
         <ol class="mini-route" aria-label="Recommended sequence">
           <li><span>1</span> Foundations and uncertainty</li>
           <li><span>2</span> Statistical tests and regression</li>
-          <li><span>3A</span> Causal questions</li>
-          <li><span>3B</span> Time-to-event questions</li>
+          <li><span>3A</span> Causal questions and matching</li>
+          <li><span>3B</span> Survival analysis and models</li>
         </ol>
       </aside>
     </section>
@@ -1058,13 +1058,13 @@
         <li class="path-step">
           <span class="step-number">03A</span>
           <h3>Reason causally</h3>
-          <p>Move from association to target trials, DAGs, standardization, weighting, and sensitivity analysis.</p>
+          <p>Move from association to target trials, DAGs, standardization, weighting, matching, and sensitivity analysis.</p>
           <a class="step-link" href="#course-causal">Study causal inference <span aria-hidden="true">→</span></a>
         </li>
         <li class="path-step">
           <span class="step-number">03B</span>
           <h3>Analyze time</h3>
-          <p>Handle censoring and event times with Kaplan–Meier, Cox PH, and accelerated failure time models.</p>
+          <p>Start with censoring, Kaplan–Meier, and competing risks, then progress to Cox PH and accelerated failure time models.</p>
           <a class="step-link" href="#course-survival">Study survival models <span aria-hidden="true">→</span></a>
         </li>
       </ol>
@@ -1165,9 +1165,39 @@
             </div>
           </article>
 
-          <article class="course-card accent-gold" id="course-survival">
+          <article class="course-card accent-blue" id="course-psm">
             <div class="course-topline">
               <span class="course-number">06</span>
+              <div class="course-meta"><span class="tag">Advanced</span><span class="tag">150–210 min</span></div>
+            </div>
+            <h3>Propensity Score Matching</h3>
+            <p class="course-title-zh" lang="zh-CN">倾向评分匹配详解</p>
+            <p class="course-description">Turn an observational causal question into an outcome-blind matching design, assess overlap and covariate balance, estimate an ATT, and report the population retained by the match.</p>
+            <p class="topic-line">estimands · matching design · overlap · SMD · ATT</p>
+            <div class="language-actions">
+              <a class="button" href="propensity_score_matching_en.html" hreflang="en" aria-label="Open Propensity Score Matching in English">English edition <span aria-hidden="true">→</span></a>
+              <a class="button" href="propensity_score_matching.html" lang="zh-CN" hreflang="zh-CN" aria-label="打开倾向评分匹配详解中文版">中文版 <span aria-hidden="true">→</span></a>
+            </div>
+          </article>
+
+          <article class="course-card accent-gold" id="course-survival">
+            <div class="course-topline">
+              <span class="course-number">07</span>
+              <div class="course-meta"><span class="tag">Advanced</span><span class="tag">180–240 min</span></div>
+            </div>
+            <h3>Survival Analysis</h3>
+            <p class="course-title-zh" lang="zh-CN">生存分析详解</p>
+            <p class="course-description">Build a complete time-to-event workflow covering censoring, Kaplan–Meier and Nelson–Aalen estimates, log-rank tests, RMST, Cox diagnostics, delayed entry, time-varying exposure, and competing risks.</p>
+            <p class="topic-line">censoring · Kaplan–Meier · RMST · delayed entry · competing risks</p>
+            <div class="language-actions">
+              <a class="button" href="survival_analysis_en.html" hreflang="en" aria-label="Open Survival Analysis in English">English edition <span aria-hidden="true">→</span></a>
+              <a class="button" href="survival_analysis.html" lang="zh-CN" hreflang="zh-CN" aria-label="打开生存分析详解中文版">中文版 <span aria-hidden="true">→</span></a>
+            </div>
+          </article>
+
+          <article class="course-card accent-violet" id="course-aft-cox">
+            <div class="course-topline">
+              <span class="course-number">08</span>
               <div class="course-meta"><span class="tag">Advanced</span><span class="tag">120–180 min</span></div>
             </div>
             <h3>AFT and Cox PH Survival Models</h3>
@@ -1218,11 +1248,13 @@
         <article class="track-card">
           <span class="track-label">Researcher <span lang="zh-CN">· 研究进阶</span></span>
           <h3>Answer causal and time-to-event questions</h3>
-          <p>After regression foundations, choose one or both branches: estimate causal effects or analyze censored event-time outcomes.</p>
+          <p>After regression foundations, choose one or both branches, then continue into the corresponding practical or model-focused deep dive.</p>
           <ul class="track-route">
             <li><a href="linear_regression_en.html">Regression foundations</a></li>
             <li><a href="causal_inference_en.html">Causal inference branch</a></li>
-            <li><a href="aft_cox_models_en.html">Survival models branch</a></li>
+            <li><a href="propensity_score_matching_en.html">Propensity score matching practice</a></li>
+            <li><a href="survival_analysis_en.html">Survival analysis branch</a></li>
+            <li><a href="aft_cox_models_en.html">AFT and Cox PH deep dive</a></li>
           </ul>
         </article>
       </div>

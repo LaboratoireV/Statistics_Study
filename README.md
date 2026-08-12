@@ -1,6 +1,6 @@
 # The V Lab Biostatistics Learning Hub
 
-一个面向公共卫生、医学、流行病学与数据科学学习者的双语生物统计学习网站。课程从统计基础与常用检验出发，逐步进入线性回归、逻辑回归、因果推断与生存分析；全部示例均提供可复现的 R 代码。
+一个面向公共卫生、医学、流行病学与数据科学学习者的双语生物统计学习网站。课程从统计基础与常用检验出发，逐步进入线性回归、逻辑回归、多层模型、因果推断与生存分析；全部示例均提供可复现的 R 代码。
 
 ## 在线网站
 
@@ -14,6 +14,7 @@
 - `medical_statistical_tests_en.html` / `medical_statistical_tests.html`：医学研究常用统计检验。
 - `linear_regression_en.html` / `linear_regression.html`：线性回归。
 - `logistic_regression_en.html` / `logistic_regression.html`：逻辑回归。
+- `multilevel_modelling_en.html` / `multilevel_modelling.html`：聚类与纵向数据的多层模型、方差分解、部分汇聚、LMM 与 GLMM。
 - `causal_inference_en.html` / `causal_inference.html`：因果推断。
 - `propensity_score_matching_en.html` / `propensity_score_matching.html`：倾向评分匹配的设计、诊断与效应估计。
 - `survival_analysis_en.html` / `survival_analysis.html`：生存分析基础、复杂事件过程与完整应用流程。
@@ -39,7 +40,7 @@ Rscript render.R
 
 ```bash
 mkdir -p .Rlib
-Rscript -e 'install.packages(c("rmarkdown", "knitr", "survival", "MatchIt"), lib = ".Rlib", repos = "https://cloud.r-project.org")'
+Rscript -e 'install.packages(c("rmarkdown", "knitr", "survival", "MatchIt", "lme4"), lib = ".Rlib", repos = "https://cloud.r-project.org")'
 ```
 
 文档中的全部数据均为固定随机种子生成的模拟数据，不包含真实个人健康信息。

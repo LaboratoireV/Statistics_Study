@@ -1,6 +1,6 @@
 # The V Lab Biostatistics Learning Hub
 
-一个面向公共卫生、医学、流行病学与数据科学学习者的双语生物统计学习网站。课程从统计基础与常用检验出发，逐步进入线性回归、逻辑回归、多层模型、因果推断与生存分析；全部示例均提供可复现的 R 代码。
+一个面向公共卫生、医学、流行病学与数据科学学习者的双语生物统计学习网站。课程从统计基础与常用检验出发，逐步进入实验设计、回归、计数与纵向模型、临床试验、因果推断、生存分析和 Meta 分析；全部示例均提供可复现的 R 代码。
 
 ## 在线网站
 
@@ -14,11 +14,16 @@
 - `medical_statistical_tests_en.html` / `medical_statistical_tests.html`：医学研究常用统计检验。
 - `linear_regression_en.html` / `linear_regression.html`：线性回归。
 - `logistic_regression_en.html` / `logistic_regression.html`：逻辑回归。
+- `design_of_experiments_en.html` / `design_of_experiments.html`：随机化、区组、析因设计、随机化推断与功效。
+- `clinical_trials_en.html` / `clinical_trials.html`：临床试验设计、estimand、常用结局模型、缺失数据与报告。
+- `poisson_zero_inflated_models_en.html` / `poisson_zero_inflated_models.html`：Poisson、负二项与零膨胀计数模型。
 - `multilevel_modelling_en.html` / `multilevel_modelling.html`：聚类与纵向数据的多层模型、方差分解、部分汇聚、LMM 与 GLMM。
+- `longitudinal_data_analysis_en.html` / `longitudinal_data_analysis.html`：重复测量、协方差结构、边际模型与混合效应轨迹。
 - `causal_inference_en.html` / `causal_inference.html`：因果推断。
 - `propensity_score_matching_en.html` / `propensity_score_matching.html`：倾向评分匹配的设计、诊断与效应估计。
 - `survival_analysis_en.html` / `survival_analysis.html`：生存分析基础、复杂事件过程与完整应用流程。
 - `aft_cox_models_en.html` / `aft_cox_models.html`：AFT 与 Cox PH 生存模型。
+- `meta_analysis_en.html` / `meta_analysis.html`：医学与心理学中的效应量、异质性、森林图与敏感性分析。
 - `includes/vlab-brand.html`：学习页面共用的 The V Lab 品牌组件。
 - `og-learning-hub.png`：学习网站的社交分享预览图。
 - `og.png`：原统计基础模块的分享预览图，供旧链接兼容使用。
@@ -40,7 +45,7 @@ Rscript render.R
 
 ```bash
 mkdir -p .Rlib
-Rscript -e 'install.packages(c("rmarkdown", "knitr", "survival", "MatchIt", "lme4"), lib = ".Rlib", repos = "https://cloud.r-project.org")'
+Rscript -e 'install.packages(c("rmarkdown", "knitr", "survival", "nlme", "MatchIt", "lme4"), lib = ".Rlib", repos = "https://cloud.r-project.org")'
 ```
 
 文档中的全部数据均为固定随机种子生成的模拟数据，不包含真实个人健康信息。

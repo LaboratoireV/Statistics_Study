@@ -1,14 +1,24 @@
-# The V Lab Biostatistics Learning Hub
+# The V Lab Learning & Project Hub
 
-一个面向公共卫生、医学、流行病学与数据科学学习者的双语生物统计学习网站。课程从统计基础与常用检验出发，逐步进入实验设计、回归、计数与纵向模型、临床试验、因果推断、生存分析和 Meta 分析；全部示例均提供可复现的 R 代码。
+LaboratoireV GitHub 账号的综合学习与项目门户，同时保留完整的双语生物统计课程。首页集中索引账号 7 个公开仓库中的 50 个独立 HTML 文件，并连接流行病学、数据可视化、R Markdown、合成健康数据项目、Snowflake 教程，以及 Alberta Health Data Atlas 互动网站。
 
 ## 在线网站
 
-访问 [The V Lab Biostatistics Learning Hub](https://laboratoirev.github.io/Statistics_Study/) 查看完整学习路线，并选择英文版、中文版或双语基础概览。
+访问 [The V Lab Learning & Project Hub](https://laboratoirev.github.io/Statistics_Study/) 浏览账号项目、搜索全部 HTML，或继续使用生物统计推荐学习路线。
+
+## 账号级目录
+
+目录于 2026-08-12 对 7 个公开仓库完成核验：
+
+- 50 个独立 HTML 文件，其中 48 个已通过 GitHub Pages 公开访问；
+- 2 个 `SNOWFLAKE_Skills` HTML 仍为公开源码，因该仓库尚未启用 Pages 而明确标为 source-only；
+- 8 个 `includes/` 页眉/页脚构建片段不计入独立页面；
+- `HealthcareData_Knowledge` 没有仓库 HTML，但其 Alberta Health Data Atlas 作为独立互动应用纳入门户；
+- 首页目录为静态 HTML，搜索和筛选仅在浏览器本地执行，不调用 GitHub API，也不收集用户输入。
 
 ## 文件
 
-- `index.html`：课程总览、推荐学习路线和全部课程入口。
+- `index.html`：账号项目总览、50 个 HTML 的搜索目录，以及生物统计推荐学习路线和课程入口。
 - `biostatistics_bilingual.html`：统计基础的中英双语概览。
 - `biostatistics_foundations.html` / `biostatistics_foundations_zh.html`：生物统计基础。
 - `medical_statistical_tests_en.html` / `medical_statistical_tests.html`：医学研究常用统计检验。
